@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ModulePage from './pages/ModulePage';
 import AssistantPage from './pages/AssistantPage';
+import ImportEmployeesPage from './pages/ImportEmployeesPage';
 import { EmptyState } from './components/Common';
 import { navigation } from './routes/navigation';
 function Content() {
@@ -15,8 +16,9 @@ function Content() {
     notice,
     setNotice
   } = useApp();
-  return <ThemeProvider theme={makeTheme(mode)}><CssBaseline /><Routes><Route path="/" element={<Navigate to="/login" replace />} />{['login', 'forgot-password', 'reset-password', 'change-password', 'first-login', 'setup'].map(page => <Route key={page} path={`/${page}`} element={<AuthPage key={page} page={page} />} />)}<Route path="/:role" element={<ProtectedRoute />}><Route index element={<Navigate to="dashboard" replace />} /><Route path="dashboard" element={<Dashboard />} /><Route path="ai-assistant" element={<AssistantPage />} />{[...new Set(Object.values(navigation).flatMap(groups => groups.flatMap(g => g.slice(1).map(([p]) => p))))].filter(p => !['dashboard', 'ai-assistant'].includes(p)).map(page => <Route key={page} path={page} element={<ModulePage key={page} page={page} />} />)}<Route path="employees/:id" element={<ModulePage page="profile" />} /></Route><Route path="/unauthorized" element={<ErrorPage unauthorized />} /><Route path="*" element={<ErrorPage />} /></Routes><Snackbar open={!!notice} autoHideDuration={6000} onClose={() => setNotice('')}><Alert severity="info" onClose={() => setNotice('')}>{notice}</Alert></Snackbar></ThemeProvider>;
+  return <ThemeProvider theme={makeTheme(mode)}><CssBaseline /><Routes><Route path="/" element={<Navigate to="/login" replace />} />{['login', 'forgot-password', 'reset-password', 'change-password', 'first-login', 'setup'].map(page => <Route key={page} path={`/${page}`} element={<AuthPage key={page} page={page} />} />)}<Route path="/:role" element={<ProtectedRoute />}><Route index element={<Navigate to="dashboard" replace />} /><Route path="dashboard" element={<Dashboard />} /><Route path="ai-assistant" element={<AssistantPage />} /><Route path="employees/import" element={<ImportRoute />} />{[...new Set(Object.values(navigation).flatMap(groups => groups.flatMap(g => g.slice(1).map(([p]) => p))))].filter(p => !['dashboard', 'ai-assistant'].includes(p)).map(page => <Route key={page} path={page} element={<ModulePage key={page} page={page} />} />)}<Route path="employees/:id" element={<ModulePage page="profile" />} /></Route><Route path="/unauthorized" element={<ErrorPage unauthorized />} /><Route path="*" element={<ErrorPage />} /></Routes><Snackbar open={!!notice} autoHideDuration={6000} onClose={() => setNotice('')}><Alert severity="info" onClose={() => setNotice('')}>{notice}</Alert></Snackbar></ThemeProvider>;
 }
+function ImportRoute() { const { role } = useApp(); return role === 'hr' ? <ImportEmployeesPage /> : <Navigate to="/unauthorized" replace />; }
 function ErrorPage({
   unauthorized
 }) {

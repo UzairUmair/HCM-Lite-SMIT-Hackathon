@@ -1,58 +1,63 @@
-import { useState } from 'react';
-import { Box, Stack, Button, TextField, Typography, Alert, Chip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
-import { Card, PageHeader, StatCard, DataTable, Fields } from '../components/Common';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Card, EmptyState, PageHeader } from '../components/Common';
 import { useApp } from '../context/AppContext';
-export default function PayrollPage({
-  page
-}) {
-  const {
-    role
-  } = useApp();
-  const [values, setValues] = useState({});
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState('');
+import { companyService, friendlyError, payrollService, peopleService } from '../services/api';
+
+function money(value) { return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(Number(value) || 0); }
+
+export default function PayrollPage({ page }) {
+  const { role, account } = useApp();
   const payslips = page === 'payslips';
   const salary = page === 'salaries';
-  return <><PageHeader title={payslips ? 'My payslips' : salary ? 'Salary management' : 'Payroll workspace'} subtitle="Clarity and care, down to the last detail." action={<TextField label="Payroll month" type="month" size="small" defaultValue={new Date().toISOString().slice(0, 7)} slotProps={{
-      inputLabel: {
-        shrink: true
+  const [month, setMonth] = useState(() => { const date = new Date(); date.setUTCMonth(date.getUTCMonth() - 1); return date.toISOString().slice(0, 7); });
+  const [employees, setEmployees] = useState([]);
+  const [records, setRecords] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [basic, setBasic] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const activeEmployee = useMemo(() => employees.find(item => item.id === selected), [employees, selected]);
+
+  async function refresh() {
+    setLoading(true); setError('');
+    try {
+      if (payslips) setRecords(await payrollService.payslips(account.uid));
+      else {
+        const [people, runs] = await Promise.all([peopleService.list(), payrollService.list()]);
+        setEmployees(people.filter(item => item.status === 'Active'));
+        setRecords(runs);
       }
-    }} />} />{!payslips && <><Box className="stats-grid four">{['Total employees', 'Gross salary', 'Deductions', 'Estimated net payroll'].map(title => <StatCard key={title} title={title} />)}</Box><Alert severity="info" sx={{
-        mb: 3
-      }}>Payroll rules and the challenge brief have not been provided. Financial calculations and finalization remain unavailable.</Alert></>}{salary && <Card title="Salary structure" sx={{
-      mb: 3
-    }}><Box component="form" onSubmit={e => {
-        e.preventDefault();
-        setError('Validated locally. No salary record was saved; the service is not connected.');
-      }}><Fields fields={['Employee code', ['Basic salary', 'number'], ['House rent allowance', 'number'], ['Medical allowance', 'number'], ['Other deductions', 'number']]} values={values} setValues={setValues} /><Typography variant="body2" sx={{
-          my: 2
-        }}>Calculated gross salary: —</Typography>{error && <Alert severity="info" sx={{
-          mb: 2
-        }}>{error}</Alert>}<Button variant="contained" type="submit">Validate structure</Button></Box></Card>}<Card title={payslips ? 'Your pay history' : 'Payroll review'} action={<Chip label="Not connected" size="small" variant="outlined" />}><Stack direction="row" sx={{
-        gap: 1,
-        flexWrap: "wrap",
-        mb: 2
-      }}>{!payslips && <><Button disabled variant="contained">Generate draft</Button><Button disabled>Submit for finalization</Button>{role === 'admin' && <Button disabled>Finalize payroll</Button>}</>}<Button variant="outlined" onClick={() => setOpen(true)}>Preview payslip layout</Button></Stack><DataTable columns={payslips ? ['Salary month', 'Gross salary', 'Deductions', 'Net salary', 'Download'] : ['Employee', 'Department', 'Basic salary', 'Allowances', 'Gross salary', 'Deductions', 'Tax', 'Net salary', 'Status']} title="Your payroll starts with verified records" text="No financial records are connected. Drafts and finalized payroll will appear here once available." /></Card><Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm"><DialogTitle>Payslip layout <Chip label="UI preview" size="small" sx={{
-          ml: 1
-        }} /></DialogTitle><DialogContent><Box className="payslip"><Typography variant="h5">HCM Lite</Typography><Typography variant="caption" sx={{
-            color: "text.secondary"
-          }}>Company name from workspace</Typography><Typography variant="h6" sx={{
-            mt: 3
-          }}>Salary statement</Typography><Typography variant="body2" sx={{
-            color: "text.secondary",
-            mb: 3
-          }}>Employee — · Code — · Month —</Typography>{['Basic salary', 'House rent allowance', 'Medical allowance', 'Gross salary', 'Deductions', 'Tax', 'Net salary'].map(label => <Stack key={label} direction="row" sx={{
-            justifyContent: "space-between",
-            py: 1.4,
-            ...{
-              borderBottom: '1px solid',
-              borderColor: 'divider'
-            }
-          }}><Typography variant="body2" sx={{
-              fontWeight: label === 'Net salary' ? 750 : 400
-            }}>{label}</Typography><Typography>—</Typography></Stack>)}<Typography variant="caption" sx={{
-            color: "text.secondary",
-            display: "block",
-            mt: 3
-          }}>Layout preview only. This is not a financial document.</Typography></Box></DialogContent><DialogActions><Button onClick={() => setOpen(false)}>Close</Button><Button disabled>Download PDF</Button></DialogActions></Dialog></>;
+    } catch (cause) { setError(friendlyError(cause)); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { refresh(); }, [page, account?.uid]);
+  async function selectEmployee(id) {
+    setSelected(id); setBasic(''); setError('');
+    if (!id) return;
+    try { const record = await peopleService.getSalary(id); setBasic(record?.basic ?? ''); }
+    catch (cause) { setError(friendlyError(cause)); }
+  }
+  async function save(event) {
+    event.preventDefault(); setBusy(true); setError(''); setSuccess('');
+    try { await payrollService.saveSalary({ id: selected, basic: Number(basic) }); setSuccess('Salary structure saved.'); }
+    catch (cause) { setError(friendlyError(cause)); }
+    finally { setBusy(false); }
+  }
+  async function generate() { setBusy(true); setError(''); setSuccess(''); try { await payrollService.generate({ month }); setSuccess('Payroll draft generated. Review each line before finalizing.'); await refresh(); } catch (cause) { setError(friendlyError(cause)); } finally { setBusy(false); } }
+  async function finalize() { setBusy(true); setError(''); setSuccess(''); try { await payrollService.finalize({ month }); setConfirm(false); setSuccess('Payroll finalized and payslips released.'); await refresh(); } catch (cause) { setError(friendlyError(cause)); } finally { setBusy(false); } }
+  async function download(slip) { setError(''); try { const [company, { downloadPayslipPdf }] = await Promise.all([companyService.get(), import('../utils/payslipPdf')]); downloadPayslipPdf(slip, company?.name || 'HCM Lite'); } catch (cause) { setError(friendlyError(cause)); } }
+  const visible = records.filter(item => item.month === month);
+  const run = !payslips ? visible[0] : null;
+  return <><PageHeader title={payslips ? 'My payslips' : salary ? 'Salary management' : 'Payroll workspace'} subtitle={payslips ? 'Your finalized salary statements.' : 'Review verified salary data and monthly payroll status.'} action={<TextField label="Month" type="month" size="small" value={month} onChange={event => setMonth(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />} />
+    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+    {!payslips && <Alert severity="info" sx={{ mb: 3 }}>Tax uses the Saylani challenge's illustrative slabs. Drafts can be generated only for completed months. A day without a check-in is absent; a missing check-out counts as half a day. Review the draft before finalization.</Alert>}
+    {salary && role === 'hr' && <Card title="Set an employee's basic salary" sx={{ mb: 3 }}><Box component="form" onSubmit={save}><Stack sx={{ gap: 2, maxWidth: 480 }}><TextField select label="Employee" required value={selected} onChange={event => selectEmployee(event.target.value)}><MenuItem value="">Select an employee</MenuItem>{employees.map(item => <MenuItem key={item.id} value={item.id}>{item.fullName} · {item.employeeCode}</MenuItem>)}</TextField><TextField label="Basic salary (PKR)" type="number" required value={basic} onChange={event => setBasic(event.target.value)} slotProps={{ htmlInput: { min: 1, step: 0.01 } }} />{activeEmployee && basic && Number(basic) > 0 && <Typography variant="body2">Gross salary before deductions: {money(Number(basic) * 1.5)} (basic + 40% HRA + 10% medical).</Typography>}<Button type="submit" variant="contained" disabled={busy || !selected || Number(basic) <= 0}>{busy ? 'Saving…' : 'Save salary structure'}</Button></Stack></Box></Card>}
+    <Card title={payslips ? 'Pay history' : 'Payroll run'} action={!payslips && (role === 'hr' ? <Button variant="contained" disabled={busy || !!run} onClick={generate}>{busy ? 'Working…' : 'Generate draft'}</Button> : role === 'admin' && run?.status === 'Draft' ? <Button variant="contained" color="success" disabled={busy} onClick={() => setConfirm(true)}>Finalize payroll</Button> : null)}>
+      {loading ? <CircularProgress /> : !visible.length ? <EmptyState title={payslips ? 'No finalized payslip for this month' : 'No payroll run for this month'} text={payslips ? 'Your payslip appears after Admin finalizes payroll.' : 'HR can generate a draft for this completed month.'} /> : <><Stack direction="row" sx={{ gap: 2, mb: 2, flexWrap: 'wrap' }}><Typography variant="body2">Status: {run?.status || 'Finalized'}</Typography>{run && <Typography variant="body2">Employees: {run.lines?.length || 0} · Net total: {money(run.netTotal)}</Typography>}</Stack><Box sx={{ overflowX: 'auto' }}><Table size="small"><TableHead><TableRow>{!payslips && <TableCell>Employee</TableCell>}<TableCell>Month</TableCell><TableCell align="right">Gross payable</TableCell><TableCell align="right">Attendance deduction</TableCell><TableCell align="right">Tax</TableCell><TableCell align="right">Net</TableCell>{payslips && <TableCell>PDF</TableCell>}</TableRow></TableHead><TableBody>{(payslips ? visible : run?.lines || []).map(item => <TableRow key={item.id || item.uid}>{!payslips && <TableCell>{item.employeeName} · {item.employeeCode}</TableCell>}<TableCell>{item.month || month}</TableCell><TableCell align="right">{money(item.prorated)}</TableCell><TableCell align="right">{money(item.deduction)}</TableCell><TableCell align="right">{money(item.tax)}</TableCell><TableCell align="right">{money(item.net)}</TableCell>{payslips && <TableCell><Button size="small" onClick={() => download(item)}>Download</Button></TableCell>}</TableRow>)}</TableBody></Table></Box></>}
+    </Card><Dialog open={confirm} onClose={() => !busy && setConfirm(false)}><DialogTitle>Finalize {month} payroll?</DialogTitle><DialogContent>This locks the draft and releases {run?.lines?.length || 0} payslips to employees. This action cannot be undone.</DialogContent><DialogActions><Button onClick={() => setConfirm(false)} disabled={busy}>Cancel</Button><Button color="success" variant="contained" onClick={finalize} disabled={busy}>{busy ? 'Finalizing…' : 'Finalize and release'}</Button></DialogActions></Dialog>
+  </>;
 }

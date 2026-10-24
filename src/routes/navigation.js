@@ -1,5 +1,14 @@
 export const navigation = {
-  admin: [['Workspace', ['dashboard','Dashboard'], ['employees','Employees'], ['attendance','Attendance'], ['leaves','Leave overview'], ['payroll','Payroll'], ['analytics','Analytics']], ['Organization', ['company','Company setup'], ['departments','Departments'], ['designations','Designations'], ['leave-policies','Leave policies'], ['holidays','Holidays'], ['hr-accounts','Manage HR accounts']], ['Connect', ['announcements','Announcements'], ['audit-logs','Audit logs'], ['ai-assistant','AI Assistant'], ['settings','Settings']]],
-  hr: [['Workspace', ['dashboard','Dashboard'], ['employees','Employees'], ['employees/new','Add employee'], ['attendance','Attendance board'], ['corrections','Attendance corrections'], ['leaves','Leave requests'], ['salaries','Salary management'], ['payroll','Payroll drafts'], ['analytics','Analytics']], ['Connect', ['announcements','Announcements'], ['ai-assistant','AI Assistant'], ['settings','Settings']]],
-  employee: [['My workspace', ['dashboard','Dashboard'], ['profile','My profile'], ['attendance','My attendance'], ['leaves','My leaves'], ['payslips','My payslips']], ['Connect', ['announcements','Announcements'], ['notifications','Notifications'], ['ai-assistant','AI Assistant'], ['settings','Settings']]]
+  admin: [
+    ['Main', ['dashboard', 'Dashboard'], ['employees', 'People'], ['attendance', 'Attendance'], ['leaves', 'Leave'], ['payroll', 'Payroll'], ['ai-assistant', 'AI Assistant'], ['announcements', 'Announcements']],
+    ['More', ['analytics', 'Analytics'], ['notifications', 'Notifications'], ['company', 'Company settings'], ['departments', 'Departments'], ['designations', 'Designations'], ['leave-policies', 'Leave policies'], ['holidays', 'Holidays'], ['hr-accounts', 'HR accounts'], ['audit-logs', 'Audit logs'], ['settings', 'My settings']],
+  ],
+  hr: [
+    ['Main', ['dashboard', 'Dashboard'], ['employees', 'Employees'], ['attendance', 'Attendance'], ['leaves', 'Leave requests'], ['payroll', 'Payroll'], ['ai-assistant', 'AI Assistant']],
+    ['More', ['employees/new', 'Add employee'], ['corrections', 'Corrections'], ['salaries', 'Salaries'], ['analytics', 'Analytics'], ['announcements', 'Announcements'], ['notifications', 'Notifications'], ['settings', 'My settings']],
+  ],
+  employee: [
+    ['My work', ['dashboard', 'My dashboard'], ['attendance', 'My attendance'], ['leaves', 'My leave'], ['payslips', 'My payslips'], ['ai-assistant', 'AI Assistant'], ['profile', 'My profile']],
+    ['More', ['announcements', 'Announcements'], ['notifications', 'Notifications'], ['settings', 'My settings']],
+  ],
 };

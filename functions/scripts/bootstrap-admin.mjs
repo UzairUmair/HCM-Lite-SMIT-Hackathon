@@ -1,0 +1,38 @@
+import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+// Run only from a trusted local machine or controlled CI. Never bundle this in the browser.
+const projectId = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID;
+const email = process.env.HCM_BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+const password = process.env.HCM_BOOTSTRAP_ADMIN_PASSWORD;
+const companyName = process.env.HCM_BOOTSTRAP_COMPANY_NAME?.trim();
+if (!projectId || !email || !password || !companyName || password.length < 12) {
+  console.error('Set FIREBASE_PROJECT_ID, HCM_BOOTSTRAP_ADMIN_EMAIL, HCM_BOOTSTRAP_ADMIN_PASSWORD (12+ chars), and HCM_BOOTSTRAP_COMPANY_NAME in your shell.');
+  process.exit(1);
+}
+initializeApp(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST
+  ? { projectId }
+  : { projectId, credential: applicationDefault() });
+const db = getFirestore();
+const auth = getAuth();
+const marker = db.doc('setup/bootstrap');
+if ((await marker.get()).exists) { console.error('Bootstrap has already completed. No account was created.'); process.exit(1); }
+
+let created;
+try {
+  created = await auth.createUser({ email, password, displayName: 'Admin' });
+  await auth.setCustomUserClaims(created.uid, { role: 'admin', companyId: 'default' });
+  await db.runTransaction(async tx => {
+    if ((await tx.get(marker)).exists) throw new Error('Bootstrap was completed concurrently.');
+    tx.create(marker, { completedAt: FieldValue.serverTimestamp(), adminUid: created.uid });
+    tx.create(db.doc('companies/default'), { companyId: 'default', name: companyName, email, officeStart: '09:00', graceMinutes: 15, timezone: 'Asia/Karachi', weekends: [0, 6], createdAt: FieldValue.serverTimestamp() });
+    tx.create(db.doc('leave_policies/default'), { companyId: 'default', annual: 14, sick: 8, casual: 10, unpaid: null, createdAt: FieldValue.serverTimestamp() });
+    tx.create(db.doc(`users/${created.uid}`), { companyId: 'default', role: 'admin', active: true, name: 'Admin', email, employeeId: null, mustChangePassword: false, createdAt: FieldValue.serverTimestamp() });
+  });
+  console.log('Initial company and Admin account created. Sign in through HCM Lite.');
+} catch (error) {
+  if (created) await auth.deleteUser(created.uid);
+  console.error('Bootstrap failed; the created Auth user was removed. Check project access and retry.');
+  process.exitCode = 1;
+}

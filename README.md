@@ -1,62 +1,112 @@
 # HCM Lite
 
-A React + Material UI frontend for people management. Built directly in the original workspace. There were no application files or Firebase configuration in the starting folder; the existing dependency declarations were preserved and Vite and MUI Icons were added.
+HCM Lite is a React, Material UI, Firebase Authentication and Firestore application for the Saylani HCM Lite challenge. It keeps the original visual system while turning the main Admin, HR and Employee flows into authenticated workflows.
 
-## Run it
+## Local setup
 
-```sh
-npm install
-npm run dev
+1. Install dependencies:
+
+   ```powershell
+   npm install
+   npm install --prefix functions
+   ```
+
+2. Copy `.env.example` to `.env.local`, then enter the Firebase Web App configuration. Do not commit `.env.local`.
+
+3. Authenticate Firebase CLI and select the project only when you are ready to deploy:
+
+   ```powershell
+   npx firebase login
+   npx firebase use hcm-lite-cff96
+   ```
+
+4. Create the first Admin using a trusted local environment with Application Default Credentials:
+
+   ```powershell
+   $env:HCM_BOOTSTRAP_EMAIL='admin@example.com'
+   $env:HCM_BOOTSTRAP_PASSWORD='a-long-unique-password'
+   npm run bootstrap --prefix functions
+   ```
+
+5. Run locally:
+
+   ```powershell
+   npm run dev
+   ```
+
+For emulator work, set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.local`, then start the suite:
+
+```powershell
+$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot'
+$env:PATH="$env:JAVA_HOME\bin;$env:PATH"
+npx firebase emulators:start
 ```
 
-Open the displayed localhost URL. Choose **Admin**, **HR**, or **Employee** in the clearly labeled preview panel. Preview roles last for the current page session; reloading returns to sign in. They are not authenticated accounts.
+## What is implemented
 
-```sh
+| Module | Status | Details |
+| --- | --- | --- |
+| Backup | Complete | Original UI preserved on `backup/ui-only` at `1e45e9998cec3384304b8e6518784abab8849ffa`; ZIP is stored outside this repository. |
+| Authentication and roles | Implemented | Firebase Auth, custom role claims plus a verified active `users` document, reset password and forced first-password change. |
+| Admin and HR provisioning | Implemented | Trusted Cloud Functions create HR and employee accounts, set claims, reserve employee codes and reveal generated temporary passwords once. |
+| Organization and people | Implemented | Company, departments, designations, holidays, leave policies, employee search, filtering, pagination, CSV validation/import/export, status controls and HR account controls. |
+| Attendance | Implemented | Server timestamps for check-in/out, late and half-day rules, correction request/review, immutable originals retained when corrections are approved. |
+| Leave | Implemented | Balance calculation, working-day and holiday checks, overlap prevention, approval, rejection, cancellation and notifications. |
+| Payroll | Implemented and unit tested | Server-side drafts use the supplied illustrative tax brackets, proration, absences, unpaid leave and half days. Admin-only finalization locks a run and releases payslips. |
+| Payslips | Implemented and unit tested | Employees can download finalized-only PDFs from their own records. |
+| Announcements and notifications | Implemented | Staff publish/edit announcements, users receive notifications and can mark their own notifications as read. |
+| Analytics and dashboards | Implemented | Dashboard KPIs and analytics are populated from Firestore records; empty states are shown when no data exists. |
+| AI assistant | Implemented but needs provider secret | Cloud Function uses a Groq secret, role-aware tool calls, server-side rate limiting and timeouts. Configure `GROQ_API_KEY` before deployment. |
+| Firestore rules | Implemented and emulator tested | Direct client changes are restricted; payroll, audit and sensitive account operations are server-side. |
+
+## Security model
+
+Firebase Authentication is used instead of a custom bcrypt/JWT implementation. The role is checked both in custom claims and the active Firestore profile. Cloud Functions own account creation, attendance writes, leave decisions, payroll calculations, finalization, audit records and AI access. Firestore Rules prevent a client from changing a role, salary, payroll, audit record or another employee’s private record.
+
+Required secret for AI deployment:
+
+```powershell
+npx firebase functions:secrets:set GROQ_API_KEY
+```
+
+Cloud Functions deployment generally requires Firebase Blaze billing. This project does not enable billing or deploy anything automatically. Deploy only after the project owner has enabled and approved the appropriate plan:
+
+```powershell
 npm run build
-npm run preview
+npx firebase deploy --only firestore,functions,hosting
 ```
-
-## Screens
-
-- Authentication: sign in, forgot/reset/change password, first-login password change, four-step company setup, unauthorized and not-found pages.
-- Admin: dashboard, company settings, departments, designations, leave policies, holidays, HR accounts, employees, attendance, leave overview, payroll, analytics, announcements, audit trail, AI and settings.
-- HR: dashboard, directory, employee registration, attendance, correction request interface, leave inbox, salary structures, payroll drafts, analytics, announcements, AI and settings.
-- Employee: dashboard, own profile, attendance calendar/history, leave balances/application, payslip layout/history, announcements, notifications, AI and settings.
-- Shared: responsive sidebar/drawer, navigation search, profile menu, notifications drawer, persisted light/dark theme, accessible form labels, reduced-motion support and scrollable tables.
-
-## What works locally
-
-Navigation, role preview selection, dark mode, drawers, collapsible menus, profile tabs, calendar month navigation, form inputs and required/email/password/date validation, setup steps/review, CSV file selection, payslip layout preview, AI prompt selection and unavailable/retry feedback.
-
-Search/filter/sort/pagination controls have no real records to process yet. There is no seeded HR or financial data. Unknown metrics use a dash, not an unverified zero. Table row edit/delete, approval, account reset and audit details require real selected records; the empty UI does not fabricate these records.
-
-## UI-only operations
-
-Authentication, secure company creation, data persistence, account provisioning, attendance recording, leave approval, import/export, payroll calculations/finalization, PDF download, publishing, notifications and AI require backend integration. Forms explicitly report that nothing was saved. Disabled controls do not claim success. AI has no hardcoded generated responses and sends nothing to an AI provider.
-
-The payroll challenge brief was not supplied, so salary rules, deductions and tax have deliberately not been invented.
-
-## Where things live
-
-- `src/App.jsx`: wires the theme and page routes together.
-- `src/routes/navigation.js`: the menu structure for each role.
-- `src/routes/ProtectedRoute.jsx`: preview-only navigation guard.
-- `src/context/AppContext.jsx`: temporary role selection and persistent theme preference.
-- `src/components/Layout.jsx`: sidebar, top bar, menu and notification drawer.
-- `src/components/Common.jsx`: shared cards, form fields, empty states, tables, dialogs and skeletons.
-- `src/pages/`: screen modules grouped by workflow so shared screens are not duplicated for each role.
-- `src/theme/theme.js`: colors, typography and MUI component defaults.
-- `src/styles/global.css`: custom branding, responsive layouts and animation rules.
-- `src/services/api.js`: service contracts to replace with real authenticated calls.
-
-## Connecting Firebase later
-
-Add your Firebase initialization in `src/firebase.js` after supplying your project configuration. Replace preview roles with Firebase Auth state and verified claims. Connect each service adapter in `src/services/api.js` to your authenticated API or permitted Firestore reads. Add loading/error/empty/success handling around those calls using the shared components.
-
-Enforce authorization in Firebase rules and server code. Admin bootstrap and role assignment, account provisioning, server-timestamped attendance, leave quota/overlap validation, payroll calculations and finalization, and immutable audit events must use trusted server operations. Employee reads must be scoped to the authenticated employee. Never put AI provider secrets in frontend variables.
 
 ## Verification
 
-Production build passes. Browser inspection covered login, role navigation, dashboard and directory, with viewport checks at 375, 768, 1024 and 1440 pixels. The `responsive.html` development harness lets you repeat viewport checks without adding a browser dependency; it is not part of the default production build.
+Run:
 
-`npm audit` reports four high-severity dependency entries from the existing Firebase / Firestore / gRPC dependency chain. Its suggested fix is a major Firebase downgrade, so it was not applied automatically. Review the supported upstream fix before backend integration. Firebase is not imported by this UI.
+```powershell
+npm run build
+npm test --prefix functions
+node --test src/utils/payslipPdf.test.js
+$env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot'
+$env:PATH="$env:JAVA_HOME\bin;$env:PATH"
+npx firebase emulators:exec --project demo-hcm-lite-rules --only firestore "node --test tests/firestore.rules.test.mjs"
+```
+
+The function tests cover working days, leave overlap/balances, attendance status and correction timestamps, each supplied tax boundary, deduction rules, joining-date proration, payroll locking and finalized-only PDF generation. Rules tests cover employee isolation, protected salaries/payslips/audits, staff access and correctly scoped employee payslip queries.
+
+## Backup restoration
+
+To view the original UI without changing current work:
+
+```powershell
+git show backup/ui-only:src/App.jsx
+```
+
+To work from the original UI in another branch, save current work first and then run:
+
+```powershell
+git switch -c restore-original backup/ui-only
+```
+
+The archive is `C:\Users\USER\Documents\hcm-lite-original-ui-backup.zip`. Extract it into a separate folder rather than over this workspace.
+
+## Roman Urdu presentation note
+
+“HCM Lite mein Admin company aur HR accounts manage karta hai. HR employee add karta hai, attendance aur leave approve karta hai. Employee apni attendance, leave balance aur finalized payslip dekh sakta hai. Sensitive kaam browser se direct nahi hotay; Cloud Functions server par validation karti hain. Is liye employee role ya salary change nahi kar sakta. Payroll mein basic ka 40% HRA aur 10% medical add hota hai, phir attendance, unpaid leave aur Saylani ke tax slabs apply hotay hain. Finalize ke baad payroll lock ho jata hai.”

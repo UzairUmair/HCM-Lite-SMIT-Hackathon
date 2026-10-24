@@ -18,10 +18,10 @@ import LightModeOutlined from "@mui/icons-material/LightModeOutlined";
 import LogoutRounded from "@mui/icons-material/LogoutRounded";
 import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
 import ChevronLeftRounded from "@mui/icons-material/ChevronLeftRounded";
-import CloseRounded from "@mui/icons-material/CloseRounded";
 import { navigation } from '../routes/navigation';
 import { useApp } from '../context/AppContext';
-import { EmptyState } from './Common';
+import { authService } from '../services/api';
+import NotificationDrawer from './NotificationDrawer';
 export function Logo() {
   return <Stack direction="row" sx={{
     gap: 1.2,
@@ -43,7 +43,7 @@ function NavIcon({
 export default function Layout() {
   const {
     role,
-    setRole,
+    account,
     mode,
     toggleMode
   } = useApp();
@@ -52,7 +52,7 @@ export default function Layout() {
   useEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
   const [mobile, setMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [closed, setClosed] = useState({});
+  const [closed, setClosed] = useState({ More: true });
   const [notifications, setNotifications] = useState(false);
   const [menu, setMenu] = useState(null);
   const [search, setSearch] = useState('');
@@ -64,7 +64,7 @@ export default function Layout() {
         }}>Your workspace</Typography><Typography sx={{
           fontSize: 10,
           color: "#97a8c5"
-        }}>{role.toUpperCase()} PREVIEW</Typography></Box></Box><Box component="nav" sx={{
+        }}>{role.toUpperCase()}</Typography></Box></Box><Box component="nav" sx={{
       flex: 1,
       overflowY: 'auto'
     }}>{navigation[role].map(([group, ...items]) => <Box key={group} sx={{
@@ -84,13 +84,10 @@ export default function Layout() {
       }}>{role.slice(0, 2).toUpperCase()}</Avatar><Box><Typography sx={{
           fontSize: 12,
           fontWeight: 600
-        }}>{role === 'hr' ? 'HR' : role[0].toUpperCase() + role.slice(1)} preview</Typography><Typography sx={{
+        }}>{account?.name || account?.fullName || role.toUpperCase()}</Typography><Typography sx={{
           fontSize: 10,
           color: "#97a8c5"
-        }}>Explore your workspace</Typography></Box><IconButton aria-label="Exit preview" onClick={() => {
-        setRole(null);
-        navigate('/login');
-      }} sx={{
+        }}>Signed in</Typography></Box><IconButton aria-label="Sign out" onClick={async () => { await authService.signOut(); navigate('/login'); }} sx={{
         color: '#aebbd3'
       }}><LogoutRounded fontSize="small" /></IconButton></Box></Box>;
   return <Box className={`app-shell ${collapsed ? 'is-collapsed' : ''}`}><Box className="desktop-sidebar">{sidebar}</Box><Drawer open={mobile} onClose={() => setMobile(false)} slotProps={{
@@ -129,20 +126,8 @@ export default function Layout() {
           setSearch('');
         }}>{label}</MenuItem>)}{!links.some(([, label]) => label.toLowerCase().includes(search.toLowerCase())) && <Typography sx={{
           p: 2
-        }}>No matching pages</Typography>}</Box>}<Box className="preview-strip"><span className="status-dot" /> Frontend preview <span className="preview-detail">· Your workspace is ready to connect</span><Button size="small" onClick={() => navigate('/login')}>Switch role</Button></Box><Box component="main" className="page-content" key={location.pathname}><Outlet /></Box><Box component="footer" className="footer"><span>HCM Lite · Smarter People Management</span><span>Made for your people.</span></Box></Box><Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}><MenuItem onClick={() => {
+        }}>No matching pages</Typography>}</Box>}<Box component="main" className="page-content" key={location.pathname}><Outlet /></Box><Box component="footer" className="footer"><span>HCM Lite · Smarter People Management</span><span>Made for your people.</span></Box></Box><Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}><MenuItem onClick={() => {
         navigate(`/${role}/settings`);
         setMenu(null);
-      }}>Account settings</MenuItem><MenuItem onClick={() => {
-        setRole(null);
-        navigate('/login');
-      }}>Exit preview</MenuItem></Menu><Drawer anchor="right" open={notifications} onClose={() => setNotifications(false)} slotProps={{
-      paper: {
-        sx: {
-          width: 'min(400px, 100vw)',
-          p: 3
-        }
-      }
-    }}><Stack direction="row" sx={{
-        justifyContent: "space-between"
-      }}><Typography variant="h6">Notifications</Typography><IconButton aria-label="Close notifications" onClick={() => setNotifications(false)}><CloseRounded /></IconButton></Stack><EmptyState title="You're all caught up" text="Leave decisions, announcements and payslip notifications will appear here when connected." /></Drawer></Box>;
+      }}>Account settings</MenuItem><MenuItem onClick={async () => { await authService.signOut(); navigate('/login'); }}>Sign out</MenuItem></Menu><NotificationDrawer open={notifications} onClose={() => setNotifications(false)} /></Box>;
 }

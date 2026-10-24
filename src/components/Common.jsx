@@ -74,7 +74,8 @@ export function LoadingSkeleton() {
 export function StatCard({
   title,
   icon: Icon,
-  detail
+  detail,
+  value
 }) {
   return <Card sx={{
     p: 2.5
@@ -89,7 +90,7 @@ export function StatCard({
       fontSize: 30,
       fontWeight: 750,
       my: 1
-    }}>—</Typography><Typography variant="caption" sx={{
+    }}>{value ?? '—'}</Typography><Typography variant="caption" sx={{
       color: "text.secondary"
     }}>{detail || 'Awaiting connected data'}</Typography></Card>;
 }
