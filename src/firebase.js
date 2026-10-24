@@ -3,13 +3,25 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
+// Firebase web configuration identifies the public client application; it is
+// intentionally not a secret. Environment values take precedence, while the
+// defaults keep static hosts such as Vercel functional after deployment.
+const hostedDefaults = {
+  apiKey: 'AIzaSyBZ6X0VEPeA1cRFqFc6mcRR4qgH6hKuaOo',
+  authDomain: 'hcm-lite-cff96.firebaseapp.com',
+  projectId: 'hcm-lite-cff96',
+  storageBucket: 'hcm-lite-cff96.firebasestorage.app',
+  messagingSenderId: '175133697594',
+  appId: '1:175133697594:web:8a7bfbf039c08020073703',
+};
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || hostedDefaults.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || hostedDefaults.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || hostedDefaults.projectId,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || hostedDefaults.storageBucket,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || hostedDefaults.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || hostedDefaults.appId,
 };
 
 export const firebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
