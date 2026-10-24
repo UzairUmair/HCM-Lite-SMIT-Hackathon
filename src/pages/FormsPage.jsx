@@ -18,8 +18,34 @@ function AddEmployee() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
-  useEffect(() => { Promise.all([organizationService.list('departments'), organizationService.list('designations')]).then(([d, t]) => { setDepartments(d); setDesignations(t); }).catch(cause => setError(friendlyError(cause))); }, []);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupBusy, setSetupBusy] = useState(false);
+  const [setupError, setSetupError] = useState('');
+  const [setup, setSetup] = useState({ departmentId: '', departmentName: '', departmentCode: '', designationName: '' });
+  async function refreshOptions() {
+    try { const [d, t] = await Promise.all([organizationService.list('departments'), organizationService.list('designations')]); setDepartments(d); setDesignations(t); }
+    catch (cause) { setError(friendlyError(cause)); }
+  }
+  useEffect(() => { refreshOptions(); }, []);
   const change = key => event => setForm({ ...form, [key]: event.target.value });
+  function openQuickSetup() { setSetup({ departmentId: departments[0]?.id || '', departmentName: '', departmentCode: '', designationName: '' }); setSetupError(''); setSetupOpen(true); }
+  async function saveQuickSetup(event) {
+    event.preventDefault(); setSetupBusy(true); setSetupError('');
+    try {
+      let departmentId = setup.departmentId;
+      if (!departmentId) {
+        if (!setup.departmentName.trim() || !setup.departmentCode.trim()) throw new Error('Enter a department name and code.');
+        const created = await organizationService.add('departments', { name: setup.departmentName.trim(), code: setup.departmentCode.trim(), status: 'Active' });
+        departmentId = created?.id || created;
+      }
+      if (!setup.designationName.trim()) throw new Error('Enter a designation name.');
+      const designation = await organizationService.add('designations', { name: setup.designationName.trim(), departmentId, status: 'Active' });
+      await refreshOptions();
+      setForm(current => ({ ...current, departmentId, designationId: designation?.id || designation }));
+      setSetupOpen(false);
+    } catch (cause) { setSetupError(friendlyError(cause)); }
+    finally { setSetupBusy(false); }
+  }
   function next(event) {
     event.preventDefault(); setError('');
     if (step === 0 && (!form.fullName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))) return setError('Enter a name and valid email.');
@@ -37,13 +63,13 @@ function AddEmployee() {
     <Stepper activeStep={step} alternativeLabel sx={{ mb: 4 }}>{employeeSteps.map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}</Stepper>
     <Box component="form" onSubmit={next}><Stack sx={{ gap: 2, maxWidth: 600 }}>
       {step === 0 && <><TextField label="Full name" required value={form.fullName} onChange={change('fullName')} /><TextField label="Work email" type="email" required value={form.email} onChange={change('email')} /><TextField label="Phone" value={form.phone} onChange={change('phone')} /><TextField label="Address" value={form.address} onChange={change('address')} /></>}
-      {step === 1 && <><TextField label="Employee code" required value={form.employeeCode} onChange={change('employeeCode')} helperText="Use letters, numbers and hyphens." /><TextField label="Department" select required value={form.departmentId} onChange={change('departmentId')}>{departments.map(row => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</TextField><TextField label="Designation" select required value={form.designationId} onChange={change('designationId')}>{designations.filter(row => !row.departmentId || row.departmentId === form.departmentId).map(row => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</TextField><TextField label="Joining date" type="date" required value={form.joiningDate} onChange={change('joiningDate')} slotProps={{ inputLabel: { shrink: true } }} />{!departments.length && <Alert severity="info">An Admin needs to add a department first.</Alert>}</>}
+      {step === 1 && <><TextField label="Employee code" required value={form.employeeCode} onChange={change('employeeCode')} helperText="Use letters, numbers and hyphens." /><TextField label="Department" select required value={form.departmentId} onChange={event => setForm({ ...form, departmentId: event.target.value, designationId: '' })}>{departments.map(row => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</TextField><TextField label="Designation" select required value={form.designationId} onChange={change('designationId')} disabled={!form.departmentId}>{designations.filter(row => !row.departmentId || row.departmentId === form.departmentId).map(row => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</TextField><TextField label="Joining date" type="date" required value={form.joiningDate} onChange={change('joiningDate')} slotProps={{ inputLabel: { shrink: true } }} />{(!departments.length || !designations.length) && <Alert severity="info" action={<Button size="small" onClick={openQuickSetup}>Quick setup</Button>}>Create a department and designation to continue. You can do it here without leaving this form.</Alert>}</>}
       {step === 2 && <><TextField label="Basic monthly salary" type="number" required value={form.basicSalary} onChange={change('basicSalary')} slotProps={{ htmlInput: { min: 1 } }} /><Alert severity="info">House rent allowance is 40% and medical allowance is 10% of basic salary. Salary details are visible only to authorized staff.</Alert></>}
       {step === 3 && <><Typography variant="h6">Review and create</Typography>{Object.entries(form).map(([key, value]) => <Stack key={key} direction="row" sx={{ justifyContent: 'space-between', gap: 2, borderBottom: '1px solid', borderColor: 'divider', py: 1 }}><Typography variant="body2" sx={{ color: 'text.secondary' }}>{key}</Typography><Typography variant="body2" sx={{ textAlign: 'right' }}>{value || '—'}</Typography></Stack>)}<Alert severity="info">Creating this employee also provisions a Firebase login. The temporary password is shown only once.</Alert></>}
       {error && <Alert severity="error">{error}</Alert>}
       <Stack direction="row" sx={{ gap: 1, mt: 2 }}><Button onClick={() => step ? setStep(step - 1) : navigate(`/${role}/employees`)} disabled={busy}>{step ? 'Back' : 'Cancel'}</Button>{step < 3 ? <Button variant="contained" type="submit">Next</Button> : <Button variant="contained" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create employee'}</Button>}</Stack>
     </Stack></Box>
-  </Card><Dialog open={!!password} onClose={() => { setPassword(''); navigate(`/${role}/employees`); }}><DialogTitle>Employee account created</DialogTitle><DialogContent><Alert severity="success" sx={{ mb: 2 }}>The employee is saved in Firebase.</Alert><Typography variant="body2">Share this temporary password privately. It is shown only once.</Typography><Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, overflowWrap: 'anywhere' }}>{password}</Box></DialogContent><DialogActions><Button onClick={() => { setPassword(''); navigate(`/${role}/employees`); }}>Done</Button></DialogActions></Dialog></>;
+  </Card><Dialog open={setupOpen} onClose={() => !setupBusy && setSetupOpen(false)} fullWidth maxWidth="xs"><Box component="form" onSubmit={saveQuickSetup}><DialogTitle>Quick job setup</DialogTitle><DialogContent><Stack sx={{ gap: 2, pt: 1 }}>{departments.length ? <TextField select label="Department" required value={setup.departmentId} onChange={event => setSetup({ ...setup, departmentId: event.target.value })}>{departments.map(row => <MenuItem key={row.id} value={row.id}>{row.name}</MenuItem>)}</TextField> : <><TextField label="Department name" required value={setup.departmentName} onChange={event => setSetup({ ...setup, departmentName: event.target.value })} /><TextField label="Department code" required helperText="Letters, numbers and hyphens only." value={setup.departmentCode} onChange={event => setSetup({ ...setup, departmentCode: event.target.value.toUpperCase() })} /></>}<TextField label="Designation" required placeholder="e.g. Software Engineer" value={setup.designationName} onChange={event => setSetup({ ...setup, designationName: event.target.value })} />{setupError && <Alert severity="error">{setupError}</Alert>}</Stack></DialogContent><DialogActions><Button onClick={() => setSetupOpen(false)} disabled={setupBusy}>Cancel</Button><Button type="submit" variant="contained" disabled={setupBusy}>{setupBusy ? 'Creating…' : 'Save and continue'}</Button></DialogActions></Box></Dialog><Dialog open={!!password} onClose={() => { setPassword(''); navigate(`/${role}/employees`); }}><DialogTitle>Employee account created</DialogTitle><DialogContent><Alert severity="success" sx={{ mb: 2 }}>The employee is saved in Firebase.</Alert><Typography variant="body2">Share this temporary password privately. It is shown only once.</Typography><Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, overflowWrap: 'anywhere' }}>{password}</Box></DialogContent><DialogActions><Button onClick={() => { setPassword(''); navigate(`/${role}/employees`); }}>Done</Button></DialogActions></Dialog></>;
 }
 
 function CompanyPage({ policy = false }) {
