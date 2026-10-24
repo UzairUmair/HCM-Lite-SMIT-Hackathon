@@ -1,0 +1,6 @@
+import { createTheme } from '@mui/material/styles';
+export const makeTheme = (mode) => createTheme({
+  palette: { mode, primary: { main: mode === 'dark' ? '#a59cff' : '#6258E8' }, secondary: { main: '#14B8A6' }, background: { default: mode === 'dark' ? '#0d1729' : '#F6F8FC', paper: mode === 'dark' ? '#17243b' : '#fff' }, text: { primary: mode === 'dark' ? '#edf2ff' : '#18243A', secondary: mode === 'dark' ? '#aab8cf' : '#69788f' }, divider: mode === 'dark' ? '#2c3b54' : '#E6EAF2' },
+  typography: { fontFamily: 'Inter, "Segoe UI", sans-serif', h4: { fontSize: '1.8rem', fontWeight: 750, letterSpacing: '-1px' }, h5: { fontWeight: 700 }, h6: { fontSize: '1rem', fontWeight: 700 }, button: { textTransform: 'none', fontWeight: 650 }, body2: { lineHeight: 1.7 } },
+  shape: { borderRadius: 12 }, components: { MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { borderRadius: 9, minHeight: 40, paddingInline: 18 } } }, MuiPaper: { defaultProps: { elevation: 0 }, styleOverrides: { rounded: { borderRadius: 18 } } }, MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 10 } } }, MuiTableCell: { styleOverrides: { head: { fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }, root: { borderColor: 'inherit' } } } }
+});
