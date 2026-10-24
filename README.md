@@ -20,13 +20,20 @@ HCM Lite is a React, Material UI, Firebase Authentication and Firestore applicat
    npx firebase use hcm-lite-cff96
    ```
 
-4. Create the first Admin using a trusted local environment with Application Default Credentials:
+4. Create the first Admin once from a trusted developer machine. Firebase CLI login is not sufficient for this Admin SDK script: authenticate Application Default Credentials first, then provide the values only in the current PowerShell session. The command never prints the password.
 
    ```powershell
-   $env:HCM_BOOTSTRAP_EMAIL='admin@example.com'
-   $env:HCM_BOOTSTRAP_PASSWORD='a-long-unique-password'
+   gcloud auth application-default login
+   $env:FIREBASE_PROJECT_ID='hcm-lite-cff96'
+   $env:HCM_BOOTSTRAP_COMPANY_NAME='Your Company'
+   $env:HCM_BOOTSTRAP_COMPANY_EMAIL='hello@yourcompany.com'
+   $env:HCM_BOOTSTRAP_ADMIN_NAME='Your Name'
+   $env:HCM_BOOTSTRAP_ADMIN_EMAIL='admin@yourcompany.com'
+   $env:HCM_BOOTSTRAP_ADMIN_PASSWORD='a-long-unique-password'
    npm run bootstrap --prefix functions
    ```
+
+   The script stops without changing records if the workspace, bootstrap marker, or chosen email already exists. After it succeeds, use the normal HCM Lite sign-in screen. The public `/setup` page deliberately cannot create an Admin account.
 
 5. Run locally:
 

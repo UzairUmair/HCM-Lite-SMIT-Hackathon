@@ -12,6 +12,9 @@ export function friendlyError(error) {
   if (typeof error?.message === 'string' && error.message.startsWith('HCM:')) return error.message.slice(4);
   const known = {
     'auth/invalid-credential': 'Email or password is incorrect.',
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/network-request-failed': 'Unable to connect. Check your internet connection and try again.',
+    'auth/requires-recent-login': 'For security, sign in again before changing your password.',
     'auth/user-disabled': 'This account is disabled. Contact your administrator.',
     'auth/too-many-requests': 'Too many attempts. Please try again later.',
     'auth/email-already-in-use': 'That email is already in use.',
@@ -41,6 +44,7 @@ export const authService = {
   async changeFirstPassword({ Password }) { return call('changeFirstPassword', { password: Password }); },
   async signOut() { if (auth) await signOut(auth); },
 };
+export const accountService = { update: data => call('updateOwnAccount', data) };
 export const companyService = {
   async get() { ready(); const d = await getDoc(doc(db, 'companies', 'default')); return d.exists() ? { id: d.id, ...d.data() } : null; },
   save: data => call('saveCompany', data),

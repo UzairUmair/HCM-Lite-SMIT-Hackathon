@@ -41,6 +41,7 @@ export const saveCompany = onCall(base, async request => {
     contact: clean(input.contact),
     location: clean(input.location),
     officeStart: /^([01]\d|2[0-3]):[0-5]\d$/.test(input.officeStart) ? input.officeStart : '09:00',
+    officeEnd: /^([01]\d|2[0-3]):[0-5]\d$/.test(input.officeEnd) ? input.officeEnd : '17:00',
     graceMinutes: Math.min(120, Math.max(0, Number(input.graceMinutes) || 15)),
     timezone: 'Asia/Karachi',
     weekends: Array.isArray(input.weekends) ? input.weekends.filter(day => Number.isInteger(day) && day >= 0 && day <= 6) : [0, 6],
@@ -81,7 +82,7 @@ async function createAccount(request, role) {
         tx.create(db.doc(`employees/${uid}`), { companyId: 'default', uid, role: 'employee', fullName, email: workEmail, employeeCode, phone: clean(data.phone), address: clean(data.address), departmentId: clean(data.departmentId), designationId: clean(data.designationId), joiningDate: data.joiningDate, status: 'Active', createdAt: FieldValue.serverTimestamp() });
         tx.create(db.doc(`salary_records/${uid}`), { companyId: 'default', employeeId: uid, basic: Number(data.basicSalary), hraRate: 0.4, medicalRate: 0.1, updatedAt: FieldValue.serverTimestamp() });
       } else {
-        tx.create(db.doc(`employees/${uid}`), { companyId: 'default', uid, role: 'hr', fullName, email: workEmail, employeeCode: `HR-${uid.slice(0, 10).toUpperCase()}`, phone: '', address: '', departmentId: 'HR', designationId: 'HR Manager', joiningDate: new Date().toISOString().slice(0, 10), status: 'Active', createdAt: FieldValue.serverTimestamp() });
+        tx.create(db.doc(`employees/${uid}`), { companyId: 'default', uid, role: 'hr', fullName, email: workEmail, employeeCode: `HR-${uid.slice(0, 10).toUpperCase()}`, phone: clean(data.phone), address: '', departmentId: clean(data.departmentId) || 'HR', designationId: 'HR Manager', joiningDate: new Date().toISOString().slice(0, 10), status: 'Active', createdAt: FieldValue.serverTimestamp() });
       }
       tx.create(db.collection('audit_logs').doc(), audit(actor.uid, `${role}.create`, uid));
     });
@@ -100,6 +101,18 @@ export const changeFirstPassword = onCall(base, async request => {
   await adminAuth.updateUser(actor.uid, { password: newPassword });
   await db.doc(`users/${actor.uid}`).update({ mustChangePassword: false, updatedAt: FieldValue.serverTimestamp() });
   return { ok: true };
+});
+
+export const updateOwnAccount = onCall(base, async request => {
+  const actor = await identity(request, ['admin', 'hr', 'employee']);
+  const fullName = required(request.data?.fullName, 'Full name');
+  const phone = clean(request.data?.phone, 50);
+  const batch = db.batch();
+  batch.update(db.doc(`users/${actor.uid}`), { name: fullName, updatedAt: FieldValue.serverTimestamp() });
+  if (actor.employeeId) batch.update(db.doc(`employees/${actor.employeeId}`), { fullName, phone, updatedAt: FieldValue.serverTimestamp() });
+  batch.set(db.collection('audit_logs').doc(), audit(actor.uid, 'account.update', actor.uid, { fields: ['name', 'phone'] }));
+  await Promise.all([adminAuth.updateUser(actor.uid, { displayName: fullName }), batch.commit()]);
+  return { ok: true, name: fullName, phone };
 });
 
 export const checkIn = onCall(base, async request => {
