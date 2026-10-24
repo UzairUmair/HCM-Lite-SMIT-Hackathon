@@ -76,7 +76,7 @@ export default function Layout() {
             fontSize: 15
           }} /></button><Collapse in={!closed[group]}>{items.map(([path, label]) => <NavLink key={path} end to={`/${role}/${path}`} className={({
             isActive
-          }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobile(false)}><NavIcon path={path} /><span>{label}</span>{path === 'ai-assistant' && <span className="new-badge">AI</span>}</NavLink>)}</Collapse></Box>)}</Box><Box className="sidebar-bottom"><Avatar sx={{
+          }) => `nav-link ${isActive ? 'active' : ''}`} onClick={() => setMobile(false)}><NavIcon path={path} /><span>{label}</span></NavLink>)}</Collapse></Box>)}</Box><Box className="sidebar-bottom"><Avatar sx={{
         width: 34,
         height: 34,
         bgcolor: '#45436d',
