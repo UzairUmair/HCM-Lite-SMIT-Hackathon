@@ -20,9 +20,6 @@ export function AttendanceWidget({ onChanged }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [company, setCompany] = useState(undefined);
-  const [announcements, setAnnouncements] = useState([]);
-  const [activity, setActivity] = useState([]);
   const [success, setSuccess] = useState('');
   async function refresh() { setLoading(true); try { setToday((await dashboardService.get()).todayAttendance); } catch (cause) { setError(friendlyError(cause)); } finally { setLoading(false); } }
   useEffect(() => { refresh(); }, []);
@@ -40,6 +37,9 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [company, setCompany] = useState(undefined);
+  const [announcements, setAnnouncements] = useState([]);
+  const [activity, setActivity] = useState([]);
   async function refresh() { setLoading(true); try { setData(await dashboardService.get()); } catch (cause) { setError(friendlyError(cause)); } finally { setLoading(false); } }
   useEffect(() => { refresh(); }, [role]);
   useEffect(() => { announcementService.list().then(setAnnouncements).catch(cause => setError(friendlyError(cause))); if (role === 'admin') auditService.list().then(setActivity).catch(cause => setError(friendlyError(cause))); }, [role]);
