@@ -124,7 +124,15 @@ export const peopleService = {
   async setActive({ id, active }) { const batch = writeBatch(db); batch.update(doc(db, 'users', id), { active, updatedAt: serverTimestamp() }); batch.update(doc(db, 'employees', id), { status: active ? 'Active' : 'Inactive', updatedAt: serverTimestamp() }); return batch.commit(); },
   importCsv: data => call('importEmployees', data),
   createHr: data => createManagedAccount(data, 'hr'),
-  setHrActive: ({ uid, active }) => updateDoc(doc(db, 'users', uid), { active, updatedAt: serverTimestamp() }),
+  async setHrActive({ uid, active }) { const batch = writeBatch(db); batch.update(doc(db, 'users', uid), { active, updatedAt: serverTimestamp() }); batch.update(doc(db, 'employees', uid), { status: active ? 'Active' : 'Inactive', updatedAt: serverTimestamp() }); return batch.commit(); },
+  async removeAccount(uid) {
+    ready();
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'salary_records', uid));
+    batch.delete(doc(db, 'employees', uid));
+    batch.delete(doc(db, 'users', uid));
+    return batch.commit();
+  },
   listHr: () => rows('users', [where('role', '==', 'hr')], 100),
   listUsers: () => rows('users', [], 200),
   updateRole: (id, data) => updateDoc(doc(db, 'users', id), { ...data, updatedAt: serverTimestamp() }),

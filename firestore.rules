@@ -15,7 +15,7 @@ service cloud.firestore {
       allow list: if roleIs('admin');
       allow create: if roleIs('admin') && request.resource.data.keys().hasOnly(['uid','companyId','role','active','name','email','employeeId','mustChangePassword','createdAt']) && request.resource.data.uid == uid && request.resource.data.employeeId == uid && request.resource.data.companyId == 'default' && request.resource.data.role in ['employee','hr'] && request.resource.data.active == true && request.resource.data.mustChangePassword == true;
       allow update: if (owner(uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','updatedAt'])) || (roleIs('admin') && resource.data.role != 'admin' && request.resource.data.diff(resource.data).changedKeys().hasOnly(['role','active','updatedAt']) && request.resource.data.role in ['employee','hr']);
-      allow delete: if false;
+      allow delete: if roleIs('admin') && resource.data.role != 'admin';
     }
     match /companies/{id} { allow read: if active() && id == 'default'; allow write: if false; }
     match /departments/{id} {
@@ -46,9 +46,9 @@ service cloud.firestore {
       allow get: if (staff() && belongs()) || owner(resource.data.uid); allow list: if staff();
       allow update: if (owner(resource.data.uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['phone','address','updatedAt'])) || (roleIs('admin') && request.resource.data.diff(resource.data).changedKeys().hasOnly(['fullName','phone','address','departmentId','designationId','joiningDate','leavingDate','status','updatedAt']));
       allow create: if roleIs('admin') && request.resource.data.uid == id && request.resource.data.companyId == 'default' && request.resource.data.role in ['employee','hr'] && request.resource.data.keys().hasOnly(['companyId','uid','role','fullName','email','employeeCode','phone','address','departmentId','designationId','joiningDate','status','createdAt']);
-      allow delete: if false;
+      allow delete: if roleIs('admin') && get(/databases/$(database)/documents/users/$(id)).data.role != 'admin';
     }
-    match /salary_records/{id} { allow read: if staff(); allow create, update: if roleIs('admin') && request.resource.data.companyId == 'default'; allow delete: if false; }
+    match /salary_records/{id} { allow read: if staff(); allow create, update: if roleIs('admin') && request.resource.data.companyId == 'default'; allow delete: if roleIs('admin'); }
     match /attendance/{id} { allow get: if (staff() && belongs()) || owner(resource.data.uid); allow list: if staff() || (active() && resource.data.uid == request.auth.uid); allow write: if false; }
     match /attendance_corrections/{id} { allow get: if (staff() && belongs()) || owner(resource.data.uid); allow list: if staff() || (active() && resource.data.uid == request.auth.uid); allow write: if false; }
     match /leaves/{id} { allow get: if (staff() && belongs()) || owner(resource.data.uid); allow list: if staff() || (active() && resource.data.uid == request.auth.uid); allow write: if false; }

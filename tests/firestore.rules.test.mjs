@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 
 test('Firestore roles protect employee, salary, payslip and audit data', async () => {
   const environment = await initializeTestEnvironment({ projectId: 'demo-hcm-lite-rules', firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
@@ -52,5 +52,11 @@ test('Firestore roles protect employee, salary, payslip and audit data', async (
     provision.set(doc(admin, 'employees', 'employee4'), { companyId: 'default', uid: 'employee4', role: 'employee', fullName: 'Provisioned Employee', email: 'employee4@example.com', employeeCode: 'EMP-004', phone: '', address: '', departmentId: 'ENG', designationId: 'DEV', joiningDate: '2026-01-01', status: 'Active', createdAt: new Date() });
     provision.set(doc(admin, 'salary_records', 'employee4'), { companyId: 'default', employeeId: 'employee4', basic: 100000, hraRate: 0.4, medicalRate: 0.1, updatedAt: new Date() });
     await assertSucceeds(provision.commit());
+    const removal = writeBatch(admin);
+    removal.delete(doc(admin, 'salary_records', 'employee4'));
+    removal.delete(doc(admin, 'employees', 'employee4'));
+    removal.delete(doc(admin, 'users', 'employee4'));
+    await assertSucceeds(removal.commit());
+    await assertFails(deleteDoc(doc(employee, 'users', 'employee1')));
   } finally { await environment.cleanup(); }
 });

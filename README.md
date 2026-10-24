@@ -39,7 +39,7 @@ HCM Lite is a React, Material UI, Firebase Authentication and Firestore applicat
 
    4. Sign in through `/login`. HCM Lite reads this protected profile and opens `/admin/dashboard`.
 
-   There is no public signup. An Admin creates Employee accounts from **Employees → Add employee** and HR accounts from **Settings → HR accounts**. Each account receives a one-time temporary password. Admin profiles are not editable from the browser, which keeps the last Admin from being accidentally removed or demoted.
+   There is no public signup. An Admin creates Employee accounts from **Employees → Add employee** and HR accounts from **Settings → HR accounts**. Each account receives a one-time temporary password. The action menu for either type has **Remove access** (reversible) and **Remove from HCM Lite** (permanent profile removal). Admin profiles are not editable or removable from the browser.
 
 5. Run locally:
 
