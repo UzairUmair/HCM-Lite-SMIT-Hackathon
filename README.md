@@ -47,6 +47,8 @@ HCM Lite is a React, Material UI, Firebase Authentication and Firestore applicat
    npm run dev
    ```
 
+   Before testing Admin-created accounts against the Firebase project, publish the checked-in `firestore.rules` from **Firebase Console → Firestore Database → Rules → Publish**. The rules allow only an active Admin to create Employee or HR profiles, employee records, and initial salary records.
+
 For emulator work, set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.local`, then start the suite:
 
 ```powershell
@@ -61,20 +63,20 @@ npx firebase emulators:start
 | --- | --- | --- |
 | Backup | Complete | Original UI preserved on `backup/ui-only` at `1e45e9998cec3384304b8e6518784abab8849ffa`; ZIP is stored outside this repository. |
 | Authentication and roles | Implemented | Firebase Auth, verified active Firestore profiles, login, password reset and role-based redirects. Only Admin can provision Employee and HR accounts. |
-| Admin and HR provisioning | Implemented | Trusted Cloud Functions create HR and employee accounts, set claims, reserve employee codes and reveal generated temporary passwords once. |
+| Admin and HR provisioning | Implemented | An Admin creates HR and employee Firebase Auth accounts without replacing the Admin session. Firestore Rules restrict the profile, employee and initial salary records to active Admins; temporary passwords are shown once. |
 | Organization and people | Implemented | Company, departments, designations, holidays, leave policies, employee search, filtering, pagination, CSV validation/import/export, status controls and HR account controls. |
 | Attendance | Implemented | Server timestamps for check-in/out, late and half-day rules, correction request/review, immutable originals retained when corrections are approved. |
 | Leave | Implemented | Balance calculation, working-day and holiday checks, overlap prevention, approval, rejection, cancellation and notifications. |
 | Payroll | Implemented and unit tested | Server-side drafts use the supplied illustrative tax brackets, proration, absences, unpaid leave and half days. Admin-only finalization locks a run and releases payslips. |
 | Payslips | Implemented and unit tested | Employees can download finalized-only PDFs from their own records. |
 | Announcements and notifications | Implemented | Staff publish/edit announcements, users receive notifications and can mark their own notifications as read. |
-| Analytics and dashboards | Implemented | Dashboard KPIs and analytics are populated from Firestore records; empty states are shown when no data exists. |
-| AI assistant | Implemented but needs provider secret | Cloud Function uses a Groq secret, role-aware tool calls, server-side rate limiting and timeouts. Configure `GROQ_API_KEY` before deployment. |
+| Analytics and dashboards | Implemented | Local dashboard KPIs read authorized Firestore records directly; empty states are shown when no data exists. |
+| AI assistant | Local development ready | The Vite development server uses the ignored local Groq secret and provides general guidance without exposing the key. Live workspace queries remain a deployed-function feature. |
 | Firestore rules | Implemented and emulator tested | Direct client changes are restricted; payroll, audit and sensitive account operations are server-side. |
 
 ## Security model
 
-Firebase Authentication is used instead of a custom bcrypt/JWT implementation. The active `users/{uid}` Firestore profile is the shared role source for the app, Security Rules and Cloud Functions. Browser clients cannot create account or employee documents. An active Admin provisions Employee and HR accounts through trusted Cloud Functions. Users cannot edit their role; only an active Admin can change a non-Admin account between Employee and HR. Cloud Functions own attendance writes, leave decisions, payroll calculations, finalization, audit records and deployed AI access. Rules prevent a client from changing salary, payroll, audit records or another employee’s private data.
+Firebase Authentication is used instead of a custom bcrypt/JWT implementation. The active `users/{uid}` Firestore profile is the shared role source for the app and Security Rules. Only an active Admin can create Employee or HR records; public signup is disabled. Users cannot edit their role; only an active Admin can change a non-Admin account between Employee and HR. Cloud Functions continue to own attendance writes, leave decisions, payroll calculations, finalization, audit records and deployed AI access. Rules prevent a client from changing salary, payroll, audit records or another employee’s private data.
 
 The Admin provisioning flow creates the Firebase Authentication user, employment profile, salary record, and one-time temporary password together. It does not link arbitrary profiles by email.
 

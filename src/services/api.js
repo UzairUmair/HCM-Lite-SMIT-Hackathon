@@ -1,7 +1,7 @@
-import { signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { auth, db, functions, firebaseConfigured } from '../firebase';
+import { auth, db, functions, firebaseConfigured, provisioningAuth } from '../firebase';
 
 export class ServiceUnavailableError extends Error {
   constructor() { super('Firebase is not configured. No changes were saved.'); }
@@ -35,6 +35,52 @@ async function rows(name, clauses = [], max = 100) {
   ready();
   const result = await getDocs(query(collection(db, name), ...clauses, limit(max)));
   return result.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+function temporaryPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return Array.from(bytes, value => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789-_'.charAt(value % 60)).join('');
+}
+async function createManagedAccount(data, role) {
+  ready();
+  const fullName = String(data.fullName || '').trim();
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!fullName) throw new Error('Please enter your full name.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Please enter a valid email address.');
+  if (role === 'employee' && (!data.employeeCode || !data.departmentId || !data.designationId || !data.joiningDate || !(Number(data.basicSalary) > 0))) throw new Error('Complete the required employee details.');
+  const secondaryAuth = provisioningAuth();
+  const password = temporaryPassword();
+  const created = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+  try {
+    const uid = created.user.uid;
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users', uid), { uid, companyId: 'default', role, active: true, name: fullName, email, employeeId: uid, mustChangePassword: true, createdAt: serverTimestamp() });
+    if (role === 'employee') {
+      batch.set(doc(db, 'employees', uid), { companyId: 'default', uid, role, fullName, email, employeeCode: String(data.employeeCode).trim().toUpperCase(), phone: String(data.phone || '').trim(), address: String(data.address || '').trim(), departmentId: data.departmentId, designationId: data.designationId, joiningDate: data.joiningDate, status: 'Active', createdAt: serverTimestamp() });
+      batch.set(doc(db, 'salary_records', uid), { companyId: 'default', employeeId: uid, basic: Number(data.basicSalary), hraRate: 0.4, medicalRate: 0.1, updatedAt: serverTimestamp() });
+    } else {
+      batch.set(doc(db, 'employees', uid), { companyId: 'default', uid, role, fullName, email, employeeCode: `HR-${uid.slice(0, 10).toUpperCase()}`, phone: String(data.phone || '').trim(), address: '', departmentId: String(data.departmentId || 'HR').trim(), designationId: 'HR Manager', joiningDate: new Date().toISOString().slice(0, 10), status: 'Active', createdAt: serverTimestamp() });
+    }
+    await batch.commit();
+    return { uid, temporaryPassword: password };
+  } catch (error) {
+    await deleteUser(created.user).catch(() => {});
+    throw error;
+  }
+}
+async function localDashboard() {
+  ready();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Please sign in again.');
+  const profile = (await getDoc(doc(db, 'users', uid))).data();
+  const today = new Date().toISOString().slice(0, 10);
+  if (profile?.role === 'employee') {
+    const [attendance, leaves, payslips] = await Promise.all([rows('attendance', [where('uid', '==', uid)], 31), rows('leaves', [where('uid', '==', uid)], 100), rows('payslips', [where('uid', '==', uid)], 24)]);
+    return { todayAttendance: attendance.find(row => row.dateKey === today) || null, weekHours: null, leave: { annual: { remaining: '—' } }, latestPayslip: payslips[0]?.month || null };
+  }
+  const [employees, attendance, leaves, payroll] = await Promise.all([rows('employees', [], 300), rows('attendance', [], 300), rows('leaves', [], 300), getDoc(doc(db, 'payroll_runs', today.slice(0, 7)))]);
+  const activeEmployees = employees.filter(row => row.role === 'employee' && row.status === 'Active');
+  const todayAttendance = attendance.filter(row => row.dateKey === today);
+  return { totalEmployees: employees.filter(row => row.role === 'employee').length, activeEmployees: activeEmployees.length, presentToday: todayAttendance.filter(row => ['Present', 'Late', 'Half day', 'Missing checkout', 'Late · missing checkout'].includes(row.status)).length, lateToday: todayAttendance.filter(row => row.late).length, pendingLeave: leaves.filter(row => row.status === 'Pending').length, onLeaveToday: leaves.filter(row => row.status === 'Approved' && row.startDate <= today && row.endDate >= today).length, monthlyPayroll: payroll.exists() ? payroll.data().netTotal : null };
 }
 export const authService = {
   async signIn({ Email, Password }) { ready(); return signInWithEmailAndPassword(auth, Email.trim(), Password); },
@@ -73,12 +119,12 @@ export const peopleService = {
   async get(id) { ready(); const d = await getDoc(doc(db, 'employees', id)); return d.exists() ? { id: d.id, ...d.data() } : null; },
   async getSalary(id) { ready(); const d = await getDoc(doc(db, 'salary_records', id)); return d.exists() ? { id: d.id, ...d.data() } : null; },
   async updateContact(id, data) { ready(); return updateDoc(doc(db, 'employees', id), { phone: data.phone, address: data.address, updatedAt: serverTimestamp() }); },
-  register: data => call('createEmployee', data),
+  register: data => createManagedAccount(data, 'employee'),
   update: data => call('updateEmployee', data),
-  setActive: data => call('setEmployeeActive', data),
+  async setActive({ id, active }) { const batch = writeBatch(db); batch.update(doc(db, 'users', id), { active, updatedAt: serverTimestamp() }); batch.update(doc(db, 'employees', id), { status: active ? 'Active' : 'Inactive', updatedAt: serverTimestamp() }); return batch.commit(); },
   importCsv: data => call('importEmployees', data),
-  createHr: data => call('createHrAccount', data),
-  setHrActive: data => call('setHrActive', data),
+  createHr: data => createManagedAccount(data, 'hr'),
+  setHrActive: ({ uid, active }) => updateDoc(doc(db, 'users', uid), { active, updatedAt: serverTimestamp() }),
   listHr: () => rows('users', [where('role', '==', 'hr')], 100),
   listUsers: () => rows('users', [], 200),
   updateRole: (id, data) => updateDoc(doc(db, 'users', id), { ...data, updatedAt: serverTimestamp() }),
@@ -105,7 +151,7 @@ export const payrollService = {
   saveSalary: data => call('saveSalary', data),
   payslips: (uid) => rows('payslips', [where('uid', '==', uid), orderBy('month', 'desc')], 24),
 };
-export const dashboardService = { get: data => call('getDashboard', data) };
+export const dashboardService = { get: data => import.meta.env.DEV ? localDashboard(data) : call('getDashboard', data) };
 export const aiService = {
   async ask({ question, role }) {
     if (import.meta.env.DEV) {

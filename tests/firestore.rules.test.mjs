@@ -47,5 +47,10 @@ test('Firestore roles protect employee, salary, payslip and audit data', async (
     await assertFails(setDoc(doc(newEmployee, 'users', 'malicious'), { uid: 'malicious', name: 'Bad', email: 'new@example.com', role: 'admin', active: true, companyId: 'default', employeeId: 'malicious', mustChangePassword: false, createdAt: new Date() }));
     await assertSucceeds(updateDoc(doc(admin, 'users', 'employee2'), { role: 'hr', updatedAt: new Date() }));
     await assertFails(updateDoc(doc(admin, 'users', 'admin1'), { role: 'employee', updatedAt: new Date() }));
+    const provision = writeBatch(admin);
+    provision.set(doc(admin, 'users', 'employee4'), { uid: 'employee4', companyId: 'default', role: 'employee', active: true, name: 'Provisioned Employee', email: 'employee4@example.com', employeeId: 'employee4', mustChangePassword: true, createdAt: new Date() });
+    provision.set(doc(admin, 'employees', 'employee4'), { companyId: 'default', uid: 'employee4', role: 'employee', fullName: 'Provisioned Employee', email: 'employee4@example.com', employeeCode: 'EMP-004', phone: '', address: '', departmentId: 'ENG', designationId: 'DEV', joiningDate: '2026-01-01', status: 'Active', createdAt: new Date() });
+    provision.set(doc(admin, 'salary_records', 'employee4'), { companyId: 'default', employeeId: 'employee4', basic: 100000, hraRate: 0.4, medicalRate: 0.1, updatedAt: new Date() });
+    await assertSucceeds(provision.commit());
   } finally { await environment.cleanup(); }
 });
