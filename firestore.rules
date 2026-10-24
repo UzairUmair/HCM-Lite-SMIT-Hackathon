@@ -30,30 +30,49 @@ service cloud.firestore {
       allow get: if owner(uid) || roleIs('admin');
       allow list: if roleIs('admin');
       allow create: if roleIs('admin') && request.resource.data.keys().hasOnly(['uid','companyId','role','active','name','email','employeeId','mustChangePassword','createdAt']) && request.resource.data.uid == uid && request.resource.data.employeeId == uid && request.resource.data.companyId == 'default' && request.resource.data.role in ['employee','hr'] && request.resource.data.active == true && request.resource.data.mustChangePassword == true;
-      allow update: if (owner(uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','updatedAt'])) || (roleIs('admin') && resource.data.role != 'admin' && request.resource.data.diff(resource.data).changedKeys().hasOnly(['role','active','updatedAt']) && request.resource.data.role in ['employee','hr']);
+      allow update: if
+        (
+          owner(uid)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','mustChangePassword','updatedAt'])
+          && (
+            !request.resource.data.diff(resource.data).changedKeys().hasAny(['mustChangePassword'])
+            || (resource.data.mustChangePassword == true && request.resource.data.mustChangePassword == false)
+          )
+        )
+        || (
+          roleIs('admin')
+          && resource.data.role != 'admin'
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['role','active','updatedAt'])
+          && request.resource.data.role in ['employee','hr']
+        );
       allow delete: if roleIs('admin') && resource.data.role != 'admin';
     }
     match /companies/{id} { allow read: if active() && id == 'default'; allow write: if false; }
     match /departments/{id} {
-      allow get: if active() && belongs(); allow list: if active();
+      // Department creation checks for an existing code in a transaction. A
+      // missing document has no companyId yet, so get must be role-gated
+      // rather than depend on resource data.
+      allow get: if active(); allow list: if active();
       allow create: if roleIs('admin') && validCompany(request.resource.data);
       allow update: if roleIs('admin') && belongs() && validCompany(request.resource.data) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','code','status','updatedAt']);
       allow delete: if roleIs('admin') && belongs();
     }
     match /designations/{id} {
-      allow get: if active() && belongs(); allow list: if active();
+      // A designation is also checked for existence before it is created.
+      allow get, list: if active();
       allow create: if roleIs('admin') && validCompany(request.resource.data);
       allow update: if roleIs('admin') && belongs() && validCompany(request.resource.data) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','departmentId','status','updatedAt']);
       allow delete: if roleIs('admin') && belongs();
     }
     match /holidays/{id} {
-      allow get: if active() && belongs(); allow list: if active();
+      allow get, list: if active();
       allow create: if roleIs('admin') && validCompany(request.resource.data);
       allow update: if roleIs('admin') && belongs() && validCompany(request.resource.data) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name','date','updatedAt']);
       allow delete: if roleIs('admin') && belongs();
     }
     match /leave_policies/{id} {
-      allow get: if active() && belongs(); allow list: if active();
+      // The default policy is created with the same transaction pattern.
+      allow get: if active(); allow list: if active();
       allow create: if roleIs('admin') && validCompany(request.resource.data);
       allow update: if roleIs('admin') && belongs() && validCompany(request.resource.data) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['annual','sick','casual','unpaid','updatedAt']);
       allow delete: if false;

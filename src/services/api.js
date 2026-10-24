@@ -88,7 +88,15 @@ export const authService = {
   async verifyResetCode(code) { ready(); return verifyPasswordResetCode(auth, code); },
   async confirmReset(code, password) { ready(); return confirmPasswordReset(auth, code, password); },
   async changePassword({ Password }) { ready(); if (!auth.currentUser) throw new Error('Please sign in again.'); return updatePassword(auth.currentUser, Password); },
-  async changeFirstPassword({ Password }) { return call('changeFirstPassword', { password: Password }); },
+  async changeFirstPassword({ Password }) {
+    ready();
+    if (!auth.currentUser) throw new Error('Please sign in again.');
+    await updatePassword(auth.currentUser, Password);
+    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      mustChangePassword: false,
+      updatedAt: serverTimestamp(),
+    });
+  },
   async signOut() { if (auth) await signOut(auth); },
 };
 export const accountService = { update: data => call('updateOwnAccount', data) };

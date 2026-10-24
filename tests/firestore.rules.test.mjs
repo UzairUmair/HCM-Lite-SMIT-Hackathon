@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, setDoc, updateDoc, writeBatch, deleteDoc, runTransaction } from 'firebase/firestore';
 
 test('Firestore roles protect employee, salary, payslip and audit data', async () => {
   const environment = await initializeTestEnvironment({ projectId: 'demo-hcm-lite-rules', firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
@@ -11,7 +11,7 @@ test('Firestore roles protect employee, salary, payslip and audit data', async (
       await Promise.all([
         setDoc(doc(db, 'users', 'admin1'), { active: true, role: 'admin', companyId: 'default' }),
         setDoc(doc(db, 'users', 'hr1'), { active: true, role: 'hr', companyId: 'default' }),
-        setDoc(doc(db, 'users', 'employee1'), { active: true, role: 'employee', companyId: 'default' }),
+        setDoc(doc(db, 'users', 'employee1'), { active: true, role: 'employee', companyId: 'default', mustChangePassword: true }),
         setDoc(doc(db, 'users', 'employee2'), { active: true, role: 'employee', companyId: 'default' }),
         setDoc(doc(db, 'users', 'employee3'), { active: true, role: 'employee', companyId: 'default' }),
         setDoc(doc(db, 'employees', 'employee1'), { uid: 'employee1', companyId: 'default', phone: '1', address: '' }),
@@ -37,6 +37,15 @@ test('Firestore roles protect employee, salary, payslip and audit data', async (
     await assertFails(getDocs(collection(employee, 'employees')));
     await assertSucceeds(getDocs(query(collection(employee, 'payslips'), where('uid', '==', 'employee1'))));
     await assertFails(getDocs(query(collection(employee, 'payslips'), where('uid', '==', 'employee2'))));
+    await assertSucceeds(updateDoc(doc(employee, 'users', 'employee1'), { mustChangePassword: false, updatedAt: new Date() }));
+    await assertFails(updateDoc(doc(employee, 'users', 'employee1'), { mustChangePassword: true, updatedAt: new Date() }));
+
+    await assertSucceeds(runTransaction(admin, async transaction => {
+      const department = doc(admin, 'departments', 'IT');
+      const existing = await transaction.get(department);
+      if (existing.exists()) throw new Error('Department should not exist in a clean test project.');
+      transaction.set(department, { companyId: 'default', name: 'IT', code: 'IT', status: 'Active' });
+    }));
 
     const newEmployee = environment.authenticatedContext('newEmployee', { email: 'new@example.com' }).firestore();
     const registration = writeBatch(newEmployee);

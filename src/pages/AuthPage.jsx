@@ -24,7 +24,13 @@ export default function AuthPage({ page }) {
   const [visible, setVisible] = useState(false);
   const [values, setValues] = useState({});
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(params.get('passwordChanged') ? 'Password updated. Sign in with your new password.' : '');
+  const [success, setSuccess] = useState(
+    params.get('passwordChanged')
+      ? 'Password updated. Sign in with your new password.'
+      : params.get('firstLogin')
+        ? 'Please sign in again with your temporary password, then choose your new password.'
+        : ''
+  );
   const [loading, setLoading] = useState(false);
   const login = page === 'login';
   const forgot = page === 'forgot-password';
@@ -48,7 +54,17 @@ export default function AuthPage({ page }) {
       else if (forgot) { await authService.resetPassword({ Email: values.Email }); setSuccess('If this email has an account, a reset link has been sent.'); }
       else if (reset) { await authService.confirmReset(code, values.Password); setSuccess('Password changed. You can sign in now.'); }
       else { await (page === 'first-login' ? authService.changeFirstPassword : authService.changePassword)({ Password: values.Password }); if (page === 'first-login') { await authService.signOut(); navigate('/login?passwordChanged=1'); return; } setSuccess('Password updated.'); }
-    } catch (cause) { setError(friendlyError(cause)); }
+    } catch (cause) {
+      // Firebase deliberately requires a fresh sign-in before a password
+      // change. Returning to sign-in clears the stale session so a newly
+      // provisioned employee can complete their first-login step normally.
+      if (page === 'first-login' && cause?.code === 'auth/requires-recent-login') {
+        await authService.signOut();
+        navigate('/login?firstLogin=1', { replace: true });
+        return;
+      }
+      setError(friendlyError(cause));
+    }
     finally { setLoading(false); }
   }
   return <Box className="auth-page"><Box className="auth-story"><Logo /><Box className="auth-story-content"><Chip label="BUILT AROUND YOUR PEOPLE" size="small" sx={{ color: '#bdb7ff', bgcolor: '#ffffff10', mb: 3 }} /><Typography component="h1" sx={{ fontSize: { xs: 34, lg: 50 }, fontWeight: 700, lineHeight: 1.15, letterSpacing: -2 }}>Great teams.<br />Thoughtfully<br /><span style={{ color: '#a8a0ff' }}>managed.</span></Typography><Typography sx={{ color: '#aab9d3', mt: 3, maxWidth: 370, lineHeight: 1.8 }}>One calm, connected workspace for the people who make your company possible.</Typography><div className="auth-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="art-core"><PeopleOutlineRounded sx={{ fontSize: 48 }} /></div><div className="art-tag tag-one"><span className="status-dot" /> People first</div><div className="art-tag tag-two"><AutoAwesomeOutlined fontSize="small" /> A smarter workday</div></div><Stack direction="row" sx={{ gap: 3, color: '#c6d0e1', fontSize: 12 }}><span><CheckRounded sx={{ fontSize: 14 }} /> People & culture</span><span><CheckRounded sx={{ fontSize: 14 }} /> Everyday clarity</span></Stack></Box><Typography sx={{ fontSize: 11, color: '#93a5c3' }}>HCM Lite · Smarter People Management</Typography></Box>
