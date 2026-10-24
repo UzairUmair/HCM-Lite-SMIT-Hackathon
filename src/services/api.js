@@ -167,7 +167,9 @@ export const payrollService = {
   saveSalary: data => call('saveSalary', data),
   payslips: (uid) => rows('payslips', [where('uid', '==', uid), orderBy('month', 'desc')], 24),
 };
-export const dashboardService = { get: data => import.meta.env.DEV ? localDashboard(data) : call('getDashboard', data) };
+// Dashboard data is read directly from Firestore so the hosted application
+// works without a separately deployed Cloud Functions backend.
+export const dashboardService = { get: data => localDashboard(data) };
 export const aiService = {
   async ask({ question, role }) {
     if (import.meta.env.DEV) {

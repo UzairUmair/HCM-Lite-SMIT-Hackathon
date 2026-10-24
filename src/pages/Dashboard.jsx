@@ -18,7 +18,6 @@ export function AttendanceWidget({ onChanged }) {
   const [today, setToday] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   async function refresh() { setLoading(true); try { setToday((await dashboardService.get()).todayAttendance); } catch (cause) { setError(friendlyError(cause)); } finally { setLoading(false); } }
   useEffect(() => { refresh(); }, []);
@@ -39,10 +38,10 @@ export default function Dashboard() {
   const [company, setCompany] = useState(undefined);
   const [announcements, setAnnouncements] = useState([]);
   const [activity, setActivity] = useState([]);
-  async function refresh() { setLoading(true); try { setData(await dashboardService.get()); } catch (cause) { setError(friendlyError(cause)); } finally { setLoading(false); } }
+  async function refresh() { setLoading(true); try { setData(await dashboardService.get()); } catch { setData(null); } finally { setLoading(false); } }
   useEffect(() => { refresh(); }, [role]);
-  useEffect(() => { announcementService.list().then(setAnnouncements).catch(cause => setError(friendlyError(cause))); if (role === 'admin') auditService.list().then(setActivity).catch(cause => setError(friendlyError(cause))); }, [role]);
-  useEffect(() => { if (role === 'admin') companyService.get().then(setCompany).catch(cause => setError(friendlyError(cause))); }, [role]);
+  useEffect(() => { announcementService.list().then(setAnnouncements).catch(() => setAnnouncements([])); if (role === 'admin') auditService.list().then(setActivity).catch(() => setActivity([])); }, [role]);
+  useEffect(() => { if (role === 'admin') companyService.get().then(setCompany).catch(() => setCompany(null)); }, [role]);
   const employee = role === 'employee';
   const hr = role === 'hr';
   const metrics = employee ? [
@@ -64,7 +63,6 @@ export default function Dashboard() {
   const actions = employee ? [['attendance', 'View attendance'], ['leaves', 'Apply for leave'], ['payslips', 'View payslips']] : hr ? [['employees', 'Find an employee'], ['leaves', 'Review leave']] : [['employees/new', 'Add employee'], ['hr-accounts', 'Create HR account'], ['employees', 'View employees'], ['attendance', 'View attendance'], ['payroll', 'Manage payroll'], ['departments', 'Add department'], ['user-management', 'Manage users'], ['company', 'Company settings']];
   return <><PageHeader title={employee ? `Welcome, ${account?.name || 'there'}.` : hr ? 'HR overview' : 'Organization overview'} subtitle={employee ? 'Your workday, made simple.' : 'The people and tasks that need your attention.'} />
     <Box className="welcome-banner"><Box><Stack direction="row" sx={{ gap: 1, alignItems: 'center', mb: 2 }}><span className="welcome-dot" /><Typography sx={{ fontSize: 10, letterSpacing: 1.5 }}>HCM LITE · SMARTER PEOPLE MANAGEMENT</Typography></Stack><Typography variant="h4" sx={{ color: '#fff' }}>{employee ? 'Ready for your workday?' : 'Your people, in focus.'}</Typography><Typography variant="body2" sx={{ color: '#c6cbe6', mt: 1 }}>{employee ? 'Check in, plan time off and stay informed.' : 'Start with one clear action. The details are always close.'}</Typography><Button onClick={() => navigate(`/${role}/${employee ? 'attendance' : hr ? 'employees/new' : 'employees'}`)} endIcon={<ArrowForwardRounded />} sx={{ bgcolor: '#fff', color: '#242c55', mt: 3, '&:hover': { bgcolor: '#eeeaff' } }}>{employee ? 'View attendance' : hr ? 'Add employee' : 'View people'}</Button></Box><div className="banner-art" aria-hidden="true"><div className="banner-ring" /><div className="banner-ring small" /><div className="banner-tile"><PeopleOutlineRounded sx={{ fontSize: 44 }} /></div></div></Box>
-    {error && <Alert severity="error" sx={{ my: 2 }}>{error}<Button size="small" onClick={refresh}>Retry</Button></Alert>}
     {role === 'admin' && company === null && <Alert severity="info" sx={{ my: 2 }}>Welcome to HCM Lite! Complete your company settings to get started.<Button size="small" onClick={() => navigate('/admin/company')}>Company settings</Button></Alert>}
     <Box className="section-label"><Typography variant="h6">At a glance</Typography><Typography variant="caption" sx={{ color: 'text.secondary' }}>Live workspace data</Typography></Box>
     <Box className="stats-grid four">{metrics.map(([title, value, icon]) => <StatCard key={title} title={title} value={loading ? '—' : value ?? '—'} icon={icon} detail={loading ? 'Loading…' : 'From your workspace'} />)}</Box>
