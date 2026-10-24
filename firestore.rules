@@ -2,9 +2,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function userData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function active() { return signedIn() && userData().active == true; }
-    function roleIs(role) { return active() && userData().role == role; }
+    function userPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return signedIn() && exists(userPath()); }
+    function userData() { return get(userPath()).data; }
+
+    // One explicit bootstrap administrator prevents a missing or malformed
+    // profile document from locking the project owner out of the workspace.
+    // All accounts created afterwards still use their Firestore role.
+    function bootstrapAdmin() {
+      return signedIn()
+        && request.auth.token.keys().hasAll(['email'])
+        && request.auth.token.email == 'admin@gmail.com';
+    }
+    function active() {
+      return bootstrapAdmin() || (hasProfile() && userData().active == true);
+    }
+    function roleIs(role) {
+      return (role == 'admin' && bootstrapAdmin())
+        || (hasProfile() && userData().active == true && userData().role == role);
+    }
     function staff() { return roleIs('admin') || roleIs('hr'); }
     function owner(uid) { return active() && request.auth.uid == uid; }
     function belongs() { return resource.data.companyId == 'default'; }
