@@ -1,5 +1,5 @@
-import { signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions, firebaseConfigured } from '../firebase';
 
@@ -10,6 +10,7 @@ function ready() { if (!firebaseConfigured) throw new ServiceUnavailableError();
 export function friendlyError(error) {
   const code = String(error?.code || '');
   if (typeof error?.message === 'string' && error.message.startsWith('HCM:')) return error.message.slice(4);
+  if (['Please enter your full name.', 'Please enter a valid email address.', 'Use a password of at least 12 characters.', 'We could not finish setting up your account. Please try again.'].includes(error?.message)) return error.message;
   const known = {
     'auth/invalid-credential': 'Email or password is incorrect.',
     'auth/invalid-email': 'Please enter a valid email address.',
@@ -37,6 +38,25 @@ async function rows(name, clauses = [], max = 100) {
 }
 export const authService = {
   async signIn({ Email, Password }) { ready(); return signInWithEmailAndPassword(auth, Email.trim(), Password); },
+  async signUp({ fullName, email, password }) {
+    ready();
+    const name = String(fullName || '').trim();
+    const workEmail = String(email || '').trim().toLowerCase();
+    if (!name) throw new Error('Please enter your full name.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workEmail)) throw new Error('Please enter a valid email address.');
+    if (String(password || '').length < 12) throw new Error('Use a password of at least 12 characters.');
+    const result = await createUserWithEmailAndPassword(auth, workEmail, password);
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', result.user.uid), { uid: result.user.uid, name, email: workEmail, role: 'employee', active: true, companyId: 'default', employeeId: result.user.uid, mustChangePassword: false, createdAt: serverTimestamp() });
+      batch.set(doc(db, 'employees', result.user.uid), { companyId: 'default', uid: result.user.uid, role: 'employee', fullName: name, email: workEmail, employeeCode: '', phone: '', address: '', departmentId: '', designationId: '', joiningDate: '', status: 'Active', createdAt: serverTimestamp() });
+      await batch.commit();
+      return result;
+    } catch (cause) {
+      try { await deleteUser(result.user); } catch { /* The incomplete account remains blocked because it has no profile. */ }
+      throw new Error('We could not finish setting up your account. Please try again.');
+    }
+  },
   async resetPassword({ Email }) { ready(); return sendPasswordResetEmail(auth, Email.trim()); },
   async verifyResetCode(code) { ready(); return verifyPasswordResetCode(auth, code); },
   async confirmReset(code, password) { ready(); return confirmPasswordReset(auth, code, password); },
@@ -79,6 +99,8 @@ export const peopleService = {
   createHr: data => call('createHrAccount', data),
   setHrActive: data => call('setHrActive', data),
   listHr: () => rows('users', [where('role', '==', 'hr')], 100),
+  listUsers: () => rows('users', [], 200),
+  updateRole: (id, data) => updateDoc(doc(db, 'users', id), { ...data, updatedAt: serverTimestamp() }),
 };
 export const attendanceService = {
   list: (role, uid) => rows('attendance', [...(role === 'employee' ? [where('uid', '==', uid)] : []), orderBy('dateKey', 'desc')], 200),

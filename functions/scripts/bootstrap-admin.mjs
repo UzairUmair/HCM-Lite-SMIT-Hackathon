@@ -38,7 +38,7 @@ try {
     tx.create(marker, { completedAt: FieldValue.serverTimestamp(), adminUid: created.uid });
     tx.create(db.doc('companies/default'), { companyId: 'default', name: companyName, email: companyEmail, officeStart: '09:00', officeEnd: '17:00', graceMinutes: 15, timezone: 'Asia/Karachi', weekends: [0, 6], createdAt: FieldValue.serverTimestamp() });
     tx.create(db.doc('leave_policies/default'), { companyId: 'default', annual: 14, sick: 8, casual: 10, unpaid: null, createdAt: FieldValue.serverTimestamp() });
-    tx.create(db.doc(`users/${created.uid}`), { companyId: 'default', role: 'admin', active: true, name: adminName, email, employeeId: null, mustChangePassword: false, createdAt: FieldValue.serverTimestamp() });
+    tx.create(db.doc(`users/${created.uid}`), { uid: created.uid, companyId: 'default', role: 'admin', active: true, name: adminName, email, employeeId: null, mustChangePassword: false, createdAt: FieldValue.serverTimestamp() });
   });
   console.log('Initial company and Admin account created. Sign in through HCM Lite.');
 } catch (error) {

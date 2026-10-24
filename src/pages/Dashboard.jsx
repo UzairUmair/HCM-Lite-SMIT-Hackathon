@@ -9,7 +9,7 @@ import ArrowForwardRounded from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import { useApp } from '../context/AppContext';
 import { Card, PageHeader, StatCard, EmptyState } from '../components/Common';
-import { announcementService, attendanceService, auditService, dashboardService, friendlyError } from '../services/api';
+import { announcementService, attendanceService, auditService, companyService, dashboardService, friendlyError } from '../services/api';
 
 export function ChartCard({ title, subtitle, children }) {
   return <Card title={title} subtitle={subtitle}>{children || <EmptyState compact title="No data yet" text="A chart will appear when records are available." />}</Card>;
@@ -20,6 +20,7 @@ export function AttendanceWidget({ onChanged }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [company, setCompany] = useState(undefined);
   const [announcements, setAnnouncements] = useState([]);
   const [activity, setActivity] = useState([]);
   const [success, setSuccess] = useState('');
@@ -42,6 +43,7 @@ export default function Dashboard() {
   async function refresh() { setLoading(true); try { setData(await dashboardService.get()); } catch (cause) { setError(friendlyError(cause)); } finally { setLoading(false); } }
   useEffect(() => { refresh(); }, [role]);
   useEffect(() => { announcementService.list().then(setAnnouncements).catch(cause => setError(friendlyError(cause))); if (role === 'admin') auditService.list().then(setActivity).catch(cause => setError(friendlyError(cause))); }, [role]);
+  useEffect(() => { if (role === 'admin') companyService.get().then(setCompany).catch(cause => setError(friendlyError(cause))); }, [role]);
   const employee = role === 'employee';
   const hr = role === 'hr';
   const metrics = employee ? [
@@ -60,10 +62,11 @@ export default function Dashboard() {
     ['On leave', data?.onLeaveToday, BeachAccessOutlined],
     ['Monthly payroll', data?.monthlyPayroll ?? '—', AccountBalanceWalletOutlined],
   ];
-  const actions = employee ? [['attendance', 'View attendance'], ['leaves', 'Apply for leave'], ['payslips', 'View payslips']] : hr ? [['employees', 'Find an employee'], ['employees/new', 'Add employee'], ['leaves', 'Review leave']] : [['employees', 'View people'], ['company', 'Company settings'], ['payroll', 'Review payroll']];
+  const actions = employee ? [['attendance', 'View attendance'], ['leaves', 'Apply for leave'], ['payslips', 'View payslips']] : hr ? [['employees', 'Find an employee'], ['employees/new', 'Add employee'], ['leaves', 'Review leave']] : [['employees', 'View employees'], ['attendance', 'View attendance'], ['payroll', 'Manage payroll'], ['departments', 'Add department'], ['user-management', 'Manage users'], ['company', 'Company settings']];
   return <><PageHeader title={employee ? `Welcome, ${account?.name || 'there'}.` : hr ? 'HR overview' : 'Organization overview'} subtitle={employee ? 'Your workday, made simple.' : 'The people and tasks that need your attention.'} />
     <Box className="welcome-banner"><Box><Stack direction="row" sx={{ gap: 1, alignItems: 'center', mb: 2 }}><span className="welcome-dot" /><Typography sx={{ fontSize: 10, letterSpacing: 1.5 }}>HCM LITE · SMARTER PEOPLE MANAGEMENT</Typography></Stack><Typography variant="h4" sx={{ color: '#fff' }}>{employee ? 'Ready for your workday?' : 'Your people, in focus.'}</Typography><Typography variant="body2" sx={{ color: '#c6cbe6', mt: 1 }}>{employee ? 'Check in, plan time off and stay informed.' : 'Start with one clear action. The details are always close.'}</Typography><Button onClick={() => navigate(`/${role}/${employee ? 'attendance' : hr ? 'employees/new' : 'employees'}`)} endIcon={<ArrowForwardRounded />} sx={{ bgcolor: '#fff', color: '#242c55', mt: 3, '&:hover': { bgcolor: '#eeeaff' } }}>{employee ? 'View attendance' : hr ? 'Add employee' : 'View people'}</Button></Box><div className="banner-art" aria-hidden="true"><div className="banner-ring" /><div className="banner-ring small" /><div className="banner-tile"><PeopleOutlineRounded sx={{ fontSize: 44 }} /></div></div></Box>
     {error && <Alert severity="error" sx={{ my: 2 }}>{error}<Button size="small" onClick={refresh}>Retry</Button></Alert>}
+    {role === 'admin' && company === null && <Alert severity="info" sx={{ my: 2 }}>Welcome to HCM Lite! Complete your company settings to get started.<Button size="small" onClick={() => navigate('/admin/company')}>Company settings</Button></Alert>}
     <Box className="section-label"><Typography variant="h6">At a glance</Typography><Typography variant="caption" sx={{ color: 'text.secondary' }}>Live workspace data</Typography></Box>
     <Box className="stats-grid four">{metrics.map(([title, value, icon]) => <StatCard key={title} title={title} value={loading ? '—' : value ?? '—'} icon={icon} detail={loading ? 'Loading…' : 'From your workspace'} />)}</Box>
     <Box className="dashboard-columns"><Stack sx={{ gap: 3 }}>{employee || hr ? <AttendanceWidget onChanged={refresh} /> : <Card title="Recent activity">{activity.length ? <Stack sx={{ gap: 1 }}>{activity.slice(0, 4).map(item => <Typography key={item.id} variant="body2">{item.action} · {item.entity}</Typography>)}</Stack> : <EmptyState compact title="No activity yet" text="Recorded actions will appear here." />}</Card>}<Card title={hr ? 'Needs your attention' : employee ? 'Your next steps' : 'Quick actions'}><Stack sx={{ gap: 1 }}>{actions.map(([path, label]) => <Button key={path} className="quick-action" onClick={() => navigate(`/${role}/${path}`)} endIcon={<ArrowForwardRounded />}>{label}</Button>)}</Stack></Card></Stack><Stack sx={{ gap: 3 }}><Box className="ai-insight"><Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}><AutoAwesomeOutlined sx={{ color: '#a59cff' }} /><Typography variant="h6">A smarter perspective</Typography><Chip label="AI" size="small" sx={{ ml: 'auto' }} /></Stack><Typography variant="body2" sx={{ color: '#bfc8df', mt: 2 }}>Ask about the records your role can see.</Typography><Button fullWidth onClick={() => navigate(`/${role}/ai-assistant`)} sx={{ color: '#fff', border: '1px solid #ffffff26', mt: 3 }}>Open AI Assistant</Button></Box><Card title="Announcements">{announcements.length ? <Stack sx={{ gap: 1 }}>{announcements.slice(0, 3).map(item => <Box key={item.id}><Typography sx={{ fontWeight: 700 }}>{item.title}</Typography><Typography variant="body2" color="text.secondary">{item.message.slice(0, 120)}</Typography></Box>)}</Stack> : <EmptyState compact title="Nothing new yet" text="Company updates will appear here." />}<Button onClick={() => navigate(`/${role}/announcements`)}>View announcements</Button></Card></Stack></Box>

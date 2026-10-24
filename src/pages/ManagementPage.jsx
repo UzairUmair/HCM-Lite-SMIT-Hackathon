@@ -14,6 +14,7 @@ export const management = {
   designations: { title: 'Designations', subtitle: 'Keep job titles organized.', item: 'Designation', columns: ['Job title', 'Department', 'Status', 'Actions'] },
   holidays: { title: 'Holiday calendar', subtitle: 'Plan ahead for days off.', item: 'Holiday', columns: ['Holiday', 'Date', 'Actions'] },
   'hr-accounts': { title: 'HR accounts', subtitle: 'Give your HR team the access they need.', item: 'HR account', columns: ['Name', 'Email', 'Status', 'Actions'] },
+  'user-management': { title: 'User management', subtitle: 'Assign Employee or HR access for registered accounts.', columns: ['Name', 'Email', 'Role', 'Status', 'Actions'] },
   employees: { title: 'Employees', subtitle: 'Find and care for your people.', item: 'Employee', columns: ['Employee', 'Code', 'Department', 'Designation', 'Status', 'Actions'] },
   'audit-logs': { title: 'Audit trail', subtitle: 'A protected record of important actions.', columns: ['Actor', 'Action', 'Record', 'Time'] },
   corrections: { title: 'Attendance corrections', subtitle: 'Review requests to correct work records.', columns: ['Employee', 'Date', 'Reason', 'Status', 'Actions'] },
@@ -52,7 +53,7 @@ export default function ManagementPage({ page }) {
   async function refresh() {
     setLoading(true); setError('');
     try {
-      const list = page === 'employees' ? await peopleService.list() : page === 'hr-accounts' ? await peopleService.listHr() : page === 'audit-logs' ? await auditService.list() : page === 'corrections' ? await attendanceService.corrections() : await organizationService.list(page);
+      const list = page === 'employees' ? await peopleService.list() : page === 'hr-accounts' ? await peopleService.listHr() : page === 'user-management' ? await peopleService.listUsers() : page === 'audit-logs' ? await auditService.list() : page === 'corrections' ? await attendanceService.corrections() : await organizationService.list(page);
       setRecords(list);
     } catch (cause) { setError(friendlyError(cause)); }
     finally { setLoading(false); }
@@ -94,12 +95,21 @@ export default function ManagementPage({ page }) {
     try {
       if (page === 'employees') await peopleService.setActive({ id: selected.id, active: selected.status !== 'Active' });
       else if (page === 'hr-accounts') await peopleService.setHrActive({ uid: selected.id, active: !selected.active });
+      else if (page === 'user-management') await peopleService.updateRole(selected.id, { active: !selected.active });
       else await organizationService.remove(page, selected.id);
       setDialog(null); setSuccess('Change saved.'); await refresh();
     } catch (cause) { setError(friendlyError(cause)); }
     finally { setBusy(false); }
   }
-  const rowCells = row => page === 'employees' ? [row.fullName, row.employeeCode, row.departmentId, row.designationId, row.status] : page === 'hr-accounts' ? [row.name, row.email, row.active ? 'Active' : 'Inactive'] : page === 'departments' ? [row.name, row.code, row.status] : page === 'designations' ? [row.name, row.departmentId, row.status] : page === 'holidays' ? [row.name, row.date] : page === 'corrections' ? [row.employeeId, row.dateKey, row.reason, row.status] : [row.actorUid, row.action, row.entity, time(row.createdAt)];
+  async function saveRole() {
+    setBusy(true); setError(''); setSuccess('');
+    try {
+      await peopleService.updateRole(selected.id, { role: form.role });
+      setDialog(null); setSuccess('Role updated. The user will receive the new access after signing in again or refreshing.'); await refresh();
+    } catch (cause) { setError(friendlyError(cause)); }
+    finally { setBusy(false); }
+  }
+  const rowCells = row => page === 'employees' ? [row.fullName, row.employeeCode, row.departmentId, row.designationId, row.status] : page === 'hr-accounts' ? [row.name, row.email, row.active ? 'Active' : 'Inactive'] : page === 'user-management' ? [row.name, row.email, String(row.role || '').toUpperCase(), row.active ? 'Active' : 'Inactive'] : page === 'departments' ? [row.name, row.code, row.status] : page === 'designations' ? [row.name, row.departmentId, row.status] : page === 'holidays' ? [row.name, row.date] : page === 'corrections' ? [row.employeeId, row.dateKey, row.reason, row.status] : [row.actorUid, row.action, row.entity, time(row.createdAt)];
   return <>
     <PageHeader title={config.title} subtitle={config.subtitle} action={canAdd && <Button variant="contained" startIcon={<AddRounded />} onClick={() => page === 'employees' ? navigate('/hr/employees/new') : openForm()}>Add {config.item}</Button>} />
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
@@ -115,14 +125,17 @@ export default function ManagementPage({ page }) {
     <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
       {page === 'employees' && <MenuItem onClick={() => { navigate(`/${role}/employees/${selected.id}`); setMenu(null); }}>View profile</MenuItem>}
       {page === 'employees' && role === 'hr' && <MenuItem onClick={() => { openForm(selected); setMenu(null); }}>Edit employee</MenuItem>}
+      {page === 'user-management' && selected?.role !== 'admin' && <MenuItem onClick={() => { setForm({ role: selected.role }); setDialog('role'); setMenu(null); }}>Change role</MenuItem>}
       {['departments', 'designations', 'holidays'].includes(page) && <MenuItem onClick={() => { openForm(selected); setMenu(null); }}>Edit</MenuItem>}
       {['employees', 'hr-accounts', 'departments', 'designations', 'holidays'].includes(page) && <MenuItem onClick={() => { setDialog('confirm'); setMenu(null); }}>{page === 'employees' || page === 'hr-accounts' ? selected?.active || selected?.status === 'Active' ? 'Deactivate' : 'Activate' : 'Delete'}</MenuItem>}
+      {page === 'user-management' && selected?.role !== 'admin' && <MenuItem onClick={() => { setDialog('confirm'); setMenu(null); }}>{selected?.active ? 'Deactivate' : 'Activate'}</MenuItem>}
     </Menu>
     <Dialog open={dialog === 'form'} onClose={() => !busy && setDialog(null)} fullWidth maxWidth="sm"><Box component="form" onSubmit={save}><DialogTitle>{selected ? 'Edit' : 'Add'} {config.item}</DialogTitle><DialogContent><Stack sx={{ gap: 2, pt: 1 }}>
       {page === 'hr-accounts' ? <><TextField label="Full name" required value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /><TextField label="Work email" type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /><TextField label="Phone (optional)" value={form.phone || ''} onChange={e => setForm({ ...form, phone: e.target.value })} /><TextField label="Department (optional)" value={form.departmentId || ''} onChange={e => setForm({ ...form, departmentId: e.target.value })} /></> : page === 'employees' ? <><TextField label="Full name" required value={form.fullName || ''} onChange={e => setForm({ ...form, fullName: e.target.value })} /><TextField label="Phone" value={form.phone || ''} onChange={e => setForm({ ...form, phone: e.target.value })} /><TextField label="Address" value={form.address || ''} onChange={e => setForm({ ...form, address: e.target.value })} /><TextField label="Department ID" required value={form.departmentId || ''} onChange={e => setForm({ ...form, departmentId: e.target.value })} /><TextField label="Designation ID" required value={form.designationId || ''} onChange={e => setForm({ ...form, designationId: e.target.value })} /><TextField label="Joining date" type="date" required value={form.joiningDate || ''} onChange={e => setForm({ ...form, joiningDate: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} /><TextField label="Leaving date (optional)" type="date" value={form.leavingDate || ''} onChange={e => setForm({ ...form, leavingDate: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} /></> : <><TextField label={page === 'designations' ? 'Job title' : page === 'holidays' ? 'Holiday name' : 'Department name'} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />{page === 'departments' && <TextField label="Department code" required value={form.code} disabled={!!selected} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} />}{page === 'designations' && <TextField label="Department ID" required value={form.departmentId} onChange={e => setForm({ ...form, departmentId: e.target.value })} />}{page === 'holidays' && <TextField label="Date" type="date" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} slotProps={{ inputLabel: { shrink: true } }} />}</>}
       {error && <Alert severity="error">{error}</Alert>}
     </Stack></DialogContent><DialogActions><Button onClick={() => setDialog(null)} disabled={busy}>Cancel</Button><Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</Button></DialogActions></Box></Dialog>
     <Dialog open={dialog === 'confirm'} onClose={() => !busy && setDialog(null)}><DialogTitle>Confirm change</DialogTitle><DialogContent><Typography>Change the status of {selected?.fullName || selected?.name || selected?.id}? This will affect access or remove this record.</Typography>{error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}</DialogContent><DialogActions><Button onClick={() => setDialog(null)} disabled={busy}>Cancel</Button><Button color="error" onClick={confirmAction} disabled={busy}>{busy ? 'Saving…' : 'Confirm'}</Button></DialogActions></Dialog>
+    <Dialog open={dialog === 'role'} onClose={() => !busy && setDialog(null)} fullWidth maxWidth="xs"><DialogTitle>Change role</DialogTitle><DialogContent><Stack sx={{ gap: 2, pt: 1 }}><Typography variant="body2">Choose access for {selected?.name || selected?.email}. Admin access is only configured through the Firebase Console.</Typography><TextField select label="Role" value={form.role || 'employee'} onChange={event => setForm({ ...form, role: event.target.value })}><MenuItem value="employee">Employee</MenuItem><MenuItem value="hr">HR</MenuItem></TextField>{error && <Alert severity="error">{error}</Alert>}</Stack></DialogContent><DialogActions><Button onClick={() => setDialog(null)} disabled={busy}>Cancel</Button><Button variant="contained" onClick={saveRole} disabled={busy || form.role === selected?.role}>{busy ? 'Saving…' : 'Confirm role'}</Button></DialogActions></Dialog>
     <Dialog open={dialog === 'password'} onClose={() => { setTemporaryPassword(''); setDialog(null); }}><DialogTitle>Account created</DialogTitle><DialogContent><Alert severity="success" sx={{ mb: 2 }}>The account was created in Firebase.</Alert><Typography variant="body2">Share this temporary password with the account owner through a secure channel. It is shown only once.</Typography><Box sx={{ p: 2, mt: 2, bgcolor: 'action.hover', borderRadius: 1, overflowWrap: 'anywhere' }}>{temporaryPassword}</Box></DialogContent><DialogActions><Button onClick={() => { setTemporaryPassword(''); setDialog(null); }}>Done</Button></DialogActions></Dialog>
   </>;
 }

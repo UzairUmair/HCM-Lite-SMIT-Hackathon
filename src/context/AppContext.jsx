@@ -22,13 +22,16 @@ export function AppProvider({ children }) {
       if (!user) { setAuthLoading(false); return; }
       setAuthError('');
       try {
-        const [token, profile] = await Promise.all([
-          user.getIdTokenResult(true),
-          getDoc(doc(db, 'users', user.uid)),
-        ]);
-        const verifiedRole = token.claims.role;
+        // A new signup writes the profile immediately after Firebase Auth creates
+        // the account. A short retry avoids signing it out during that tiny window.
+        let profile = await getDoc(doc(db, 'users', user.uid));
+        for (let attempt = 0; !profile.exists() && attempt < 3; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          profile = await getDoc(doc(db, 'users', user.uid));
+        }
         const data = profile.data();
-        if (!['admin', 'hr', 'employee'].includes(verifiedRole) || !data || data.role !== verifiedRole || data.active !== true) {
+        const verifiedRole = data?.role;
+        if (!['admin', 'hr', 'employee'].includes(verifiedRole) || !data || data.active !== true) {
           setAuthError('This account is not active or its role has not been provisioned. Contact your administrator.');
           await signOut(auth);
         } else {

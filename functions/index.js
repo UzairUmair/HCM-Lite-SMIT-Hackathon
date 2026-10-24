@@ -22,7 +22,7 @@ async function identity(request, allowed) {
   const uid = request.auth.uid;
   const profile = await db.doc(`users/${uid}`).get();
   const user = profile.data();
-  if (!user?.active || !allowed.includes(request.auth.token.role) || user.role !== request.auth.token.role || user.companyId !== 'default') fail('permission-denied', 'You do not have permission to perform this action.');
+  if (!user?.active || !allowed.includes(user.role) || user.companyId !== 'default') fail('permission-denied', 'You do not have permission to perform this action.');
   return { uid, ...user };
 }
 function audit(actor, action, entity, details = {}) { return { companyId: 'default', actorUid: actor, action, entity, details, createdAt: FieldValue.serverTimestamp() }; }
@@ -76,7 +76,7 @@ async function createAccount(request, role) {
     await db.runTransaction(async tx => {
       const codeRef = role === 'employee' ? db.doc(`employee_codes/${employeeCode}`) : null;
       if (codeRef && (await tx.get(codeRef)).exists) fail('already-exists', 'Employee code already exists.');
-      tx.create(db.doc(`users/${uid}`), { companyId: 'default', role, active: true, name: fullName, email: workEmail, employeeId: uid, mustChangePassword: true, createdAt: FieldValue.serverTimestamp() });
+      tx.create(db.doc(`users/${uid}`), { uid, companyId: 'default', role, active: true, name: fullName, email: workEmail, employeeId: uid, mustChangePassword: true, createdAt: FieldValue.serverTimestamp() });
       if (role === 'employee') {
         tx.create(codeRef, { uid, companyId: 'default' });
         tx.create(db.doc(`employees/${uid}`), { companyId: 'default', uid, role: 'employee', fullName, email: workEmail, employeeCode, phone: clean(data.phone), address: clean(data.address), departmentId: clean(data.departmentId), designationId: clean(data.designationId), joiningDate: data.joiningDate, status: 'Active', createdAt: FieldValue.serverTimestamp() });
