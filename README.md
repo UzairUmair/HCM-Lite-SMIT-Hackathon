@@ -39,7 +39,7 @@ HCM Lite is a React, Material UI, Firebase Authentication and Firestore applicat
 
    4. Sign in through `/login`. HCM Lite reads this protected profile and opens `/admin/dashboard`.
 
-   Public `/signup` always creates an active **Employee** profile. An Admin can promote an eligible registered user to **HR** at **Settings → User management**. Admin profiles are not editable from the browser, which keeps the last Admin from being accidentally removed or demoted.
+   There is no public signup. An Admin creates Employee accounts from **Employees → Add employee** and HR accounts from **Settings → HR accounts**. Each account receives a one-time temporary password. Admin profiles are not editable from the browser, which keeps the last Admin from being accidentally removed or demoted.
 
 5. Run locally:
 
@@ -60,7 +60,7 @@ npx firebase emulators:start
 | Module | Status | Details |
 | --- | --- | --- |
 | Backup | Complete | Original UI preserved on `backup/ui-only` at `1e45e9998cec3384304b8e6518784abab8849ffa`; ZIP is stored outside this repository. |
-| Authentication and roles | Implemented | Firebase Auth, verified active Firestore profiles, login, signup, password reset and role-based redirects. Public signup can only create Employee accounts. |
+| Authentication and roles | Implemented | Firebase Auth, verified active Firestore profiles, login, password reset and role-based redirects. Only Admin can provision Employee and HR accounts. |
 | Admin and HR provisioning | Implemented | Trusted Cloud Functions create HR and employee accounts, set claims, reserve employee codes and reveal generated temporary passwords once. |
 | Organization and people | Implemented | Company, departments, designations, holidays, leave policies, employee search, filtering, pagination, CSV validation/import/export, status controls and HR account controls. |
 | Attendance | Implemented | Server timestamps for check-in/out, late and half-day rules, correction request/review, immutable originals retained when corrections are approved. |
@@ -74,9 +74,9 @@ npx firebase emulators:start
 
 ## Security model
 
-Firebase Authentication is used instead of a custom bcrypt/JWT implementation. The active `users/{uid}` Firestore profile is the shared role source for the app, Security Rules and Cloud Functions. Security Rules allow a signed-in visitor to create only their own Employee profile and linked blank employee record in one atomic signup batch. Users cannot edit their role; only an active Admin can change a non-Admin account between Employee and HR. Cloud Functions own attendance writes, leave decisions, payroll calculations, finalization, audit records and AI access. Rules prevent a client from changing salary, payroll, audit records or another employee’s private data.
+Firebase Authentication is used instead of a custom bcrypt/JWT implementation. The active `users/{uid}` Firestore profile is the shared role source for the app, Security Rules and Cloud Functions. Browser clients cannot create account or employee documents. An active Admin provisions Employee and HR accounts through trusted Cloud Functions. Users cannot edit their role; only an active Admin can change a non-Admin account between Employee and HR. Cloud Functions own attendance writes, leave decisions, payroll calculations, finalization, audit records and deployed AI access. Rules prevent a client from changing salary, payroll, audit records or another employee’s private data.
 
-The existing trusted HR employee-provisioning function remains available for the official flow. For a quick hackathon demo, the public signup flow creates its own unassigned employee record. It does not link an arbitrary existing employment record by email. Use the trusted HR provisioning flow when the employment record and account must be created together.
+The Admin provisioning flow creates the Firebase Authentication user, employment profile, salary record, and one-time temporary password together. It does not link arbitrary profiles by email.
 
 The legacy `npm run bootstrap --prefix functions` script remains a private developer fallback. It is not linked from the application and is not required for the normal Console Admin setup above.
 
@@ -126,4 +126,4 @@ The archive is `C:\Users\USER\Documents\hcm-lite-original-ui-backup.zip`. Extrac
 
 ## Roman Urdu presentation note
 
-“Pehla Admin Firebase Console mein banta hai: Authentication mein email/password user banao, UID copy karo, phir Firestore ke `users` collection mein us UID ka document bana kar `role: admin` aur `active: true` set karo. Phir normal `/login` se sign in karo. Naya user `/signup` se name, email aur password ke sath register karega aur automatic Employee dashboard mein chala jayega. Admin Settings → User management mein Employee ko HR bana sakta hai; user refresh ya dobara login kar ke HR dashboard dekhega. Admin `/admin/dashboard`, HR `/hr/dashboard`, aur Employee `/employee/dashboard` use karta hai. Signup mein Admin ya HR choose nahi kiya ja sakta aur user apna role change nahi kar sakta.”
+“Pehla Admin Firebase Console mein banta hai: Authentication mein email/password user banao, UID copy karo, phir Firestore ke `users` collection mein us UID ka document bana kar `role: admin` aur `active: true` set karo. Phir normal `/login` se sign in karo. Public signup band hai. Admin Employees → Add employee se Employee account aur Settings → HR accounts se HR account banata hai; temporary password sirf ek dafa show hota hai. Admin `/admin/dashboard`, HR `/hr/dashboard`, aur Employee `/employee/dashboard` use karta hai.”

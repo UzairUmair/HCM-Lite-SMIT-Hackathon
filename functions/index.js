@@ -55,7 +55,7 @@ export const saveCompany = onCall(base, async request => {
 });
 
 async function createAccount(request, role) {
-  const actor = await identity(request, role === 'hr' ? ['admin'] : ['hr']);
+  const actor = await identity(request, ['admin']);
   const data = request.data || {};
   const fullName = required(data.fullName, 'Full name');
   const workEmail = email(data.email);

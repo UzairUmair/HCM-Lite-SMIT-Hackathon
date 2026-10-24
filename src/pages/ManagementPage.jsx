@@ -66,7 +66,7 @@ export default function ManagementPage({ page }) {
       && (department === 'All' || row.departmentId === department);
   }), [records, queryText, status, department]);
   const departments = [...new Set(records.map(row => row.departmentId).filter(Boolean))];
-  const canAdd = !!config.item && (page === 'employees' ? role === 'hr' : page === 'hr-accounts' ? role === 'admin' : role === 'admin');
+  const canAdd = !!config.item && (page === 'employees' ? role === 'admin' : page === 'hr-accounts' ? role === 'admin' : role === 'admin');
 
   function openForm(item = null) { setSelected(item); setForm(item ? { ...blank, ...item } : blank); setDialog('form'); setError(''); }
   async function save(event) {
@@ -111,20 +111,20 @@ export default function ManagementPage({ page }) {
   }
   const rowCells = row => page === 'employees' ? [row.fullName, row.employeeCode, row.departmentId, row.designationId, row.status] : page === 'hr-accounts' ? [row.name, row.email, row.active ? 'Active' : 'Inactive'] : page === 'user-management' ? [row.name, row.email, String(row.role || '').toUpperCase(), row.active ? 'Active' : 'Inactive'] : page === 'departments' ? [row.name, row.code, row.status] : page === 'designations' ? [row.name, row.departmentId, row.status] : page === 'holidays' ? [row.name, row.date] : page === 'corrections' ? [row.employeeId, row.dateKey, row.reason, row.status] : [row.actorUid, row.action, row.entity, time(row.createdAt)];
   return <>
-    <PageHeader title={config.title} subtitle={config.subtitle} action={canAdd && <Button variant="contained" startIcon={<AddRounded />} onClick={() => page === 'employees' ? navigate('/hr/employees/new') : openForm()}>Add {config.item}</Button>} />
+    <PageHeader title={config.title} subtitle={config.subtitle} action={canAdd && <Button variant="contained" startIcon={<AddRounded />} onClick={() => page === 'employees' ? navigate('/admin/employees/new') : openForm()}>Add {config.item}</Button>} />
     {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
     <Card title={`${config.title} ${loading ? '' : `(${filtered.length})`}`}>
       <Stack direction="row" sx={{ gap: 1, mb: 3, flexWrap: 'wrap' }}>
         <TextField size="small" label="Search" value={queryText} onChange={event => { setQueryText(event.target.value); setPageNumber(0); }} />
         {!['audit-logs', 'holidays'].includes(page) && <TextField size="small" select label="Status" value={status} onChange={event => { setStatus(event.target.value); setPageNumber(0); }} sx={{ minWidth: 130 }}>{['All', 'Active', 'Inactive', 'Pending', 'Approved', 'Rejected'].map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}</TextField>}
         {page === 'employees' && <TextField size="small" select label="Department" value={department} onChange={event => { setDepartment(event.target.value); setPageNumber(0); }} sx={{ minWidth: 150 }}><MenuItem value="All">All departments</MenuItem>{departments.map(value => <MenuItem key={value} value={value}>{value}</MenuItem>)}</TextField>}
-        {page === 'employees' && role === 'hr' && <><Button startIcon={<FileUploadOutlined />} onClick={() => navigate('/hr/employees/import')}>Import CSV</Button><Button startIcon={<FileDownloadOutlined />} disabled={!records.length} onClick={() => downloadCsv(filtered)}>Export CSV</Button></>}
+        {page === 'employees' && role === 'admin' && <><Button startIcon={<FileUploadOutlined />} onClick={() => navigate('/admin/employees/import')}>Import CSV</Button><Button startIcon={<FileDownloadOutlined />} disabled={!records.length} onClick={() => downloadCsv(filtered)}>Export CSV</Button></>}
       </Stack>
       {loading ? <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress aria-label="Loading records" /></Box> : !filtered.length ? <EmptyState title={`No ${config.title.toLowerCase()} found`} text={queryText ? 'Try another search.' : 'Use the Add button to create the first record.'} /> : <><TableContainer><Table size="small" sx={{ minWidth: 650 }}><TableHead><TableRow>{config.columns.map(column => <TableCell key={column}>{column}</TableCell>)}</TableRow></TableHead><TableBody>{filtered.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize).map(row => <TableRow key={row.id} hover>{rowCells(row).map((cell, index) => <TableCell key={index}>{cell || '—'}</TableCell>)}{config.columns.includes('Actions') && <TableCell><IconButton aria-label={`Actions for ${row.name || row.fullName || row.id}`} onClick={event => { setMenu(event.currentTarget); setSelected(row); }}><MoreHorizRounded /></IconButton></TableCell>}</TableRow>)}</TableBody></Table></TableContainer><TablePagination component="div" count={filtered.length} page={pageNumber} onPageChange={(_, next) => setPageNumber(next)} rowsPerPage={pageSize} onRowsPerPageChange={event => { setPageSize(Number(event.target.value)); setPageNumber(0); }} rowsPerPageOptions={[10, 25, 50]} /></>}
     </Card>
     <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
       {page === 'employees' && <MenuItem onClick={() => { navigate(`/${role}/employees/${selected.id}`); setMenu(null); }}>View profile</MenuItem>}
-      {page === 'employees' && role === 'hr' && <MenuItem onClick={() => { openForm(selected); setMenu(null); }}>Edit employee</MenuItem>}
+      {page === 'employees' && role === 'admin' && <MenuItem onClick={() => { openForm(selected); setMenu(null); }}>Edit employee</MenuItem>}
       {page === 'user-management' && selected?.role !== 'admin' && <MenuItem onClick={() => { setForm({ role: selected.role }); setDialog('role'); setMenu(null); }}>Change role</MenuItem>}
       {['departments', 'designations', 'holidays'].includes(page) && <MenuItem onClick={() => { openForm(selected); setMenu(null); }}>Edit</MenuItem>}
       {['employees', 'hr-accounts', 'departments', 'designations', 'holidays'].includes(page) && <MenuItem onClick={() => { setDialog('confirm'); setMenu(null); }}>{page === 'employees' || page === 'hr-accounts' ? selected?.active || selected?.status === 'Active' ? 'Deactivate' : 'Activate' : 'Delete'}</MenuItem>}

@@ -1,5 +1,5 @@
-import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, updatePassword, signOut, verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions, firebaseConfigured } from '../firebase';
 
@@ -38,25 +38,6 @@ async function rows(name, clauses = [], max = 100) {
 }
 export const authService = {
   async signIn({ Email, Password }) { ready(); return signInWithEmailAndPassword(auth, Email.trim(), Password); },
-  async signUp({ fullName, email, password }) {
-    ready();
-    const name = String(fullName || '').trim();
-    const workEmail = String(email || '').trim().toLowerCase();
-    if (!name) throw new Error('Please enter your full name.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workEmail)) throw new Error('Please enter a valid email address.');
-    if (String(password || '').length < 12) throw new Error('Use a password of at least 12 characters.');
-    const result = await createUserWithEmailAndPassword(auth, workEmail, password);
-    try {
-      const batch = writeBatch(db);
-      batch.set(doc(db, 'users', result.user.uid), { uid: result.user.uid, name, email: workEmail, role: 'employee', active: true, companyId: 'default', employeeId: result.user.uid, mustChangePassword: false, createdAt: serverTimestamp() });
-      batch.set(doc(db, 'employees', result.user.uid), { companyId: 'default', uid: result.user.uid, role: 'employee', fullName: name, email: workEmail, employeeCode: '', phone: '', address: '', departmentId: '', designationId: '', joiningDate: '', status: 'Active', createdAt: serverTimestamp() });
-      await batch.commit();
-      return result;
-    } catch (cause) {
-      try { await deleteUser(result.user); } catch { /* The incomplete account remains blocked because it has no profile. */ }
-      throw new Error('We could not finish setting up your account. Please try again.');
-    }
-  },
   async resetPassword({ Email }) { ready(); return sendPasswordResetEmail(auth, Email.trim()); },
   async verifyResetCode(code) { ready(); return verifyPasswordResetCode(auth, code); },
   async confirmReset(code, password) { ready(); return confirmPasswordReset(auth, code, password); },
@@ -125,7 +106,18 @@ export const payrollService = {
   payslips: (uid) => rows('payslips', [where('uid', '==', uid), orderBy('month', 'desc')], 24),
 };
 export const dashboardService = { get: data => call('getDashboard', data) };
-export const aiService = { ask: data => call('askAssistant', data), summarize: data => call('askAssistant', data), parseLeave: data => call('parseLeave', data) };
+export const aiService = {
+  async ask({ question, role }) {
+    if (import.meta.env.DEV) {
+      const response = await fetch('/api/local-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, role }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'AI request failed.');
+      return payload;
+    }
+    return call('askAssistant', { question });
+  },
+  summarize: data => call('askAssistant', data), parseLeave: data => call('parseLeave', data),
+};
 export const announcementService = {
   list: () => rows('announcements', [orderBy('publishedAt', 'desc')], 50),
   create: data => call('publishAnnouncement', data),

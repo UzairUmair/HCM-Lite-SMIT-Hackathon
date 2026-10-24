@@ -13,15 +13,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow get: if owner(uid) || roleIs('admin');
       allow list: if roleIs('admin');
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'role', 'active', 'companyId', 'employeeId', 'mustChangePassword', 'createdAt'])
-        && request.resource.data.uid == uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.role == 'employee'
-        && request.resource.data.active == true
-        && request.resource.data.companyId == 'default'
-        && request.resource.data.employeeId == uid
-        && request.resource.data.mustChangePassword == false;
+      allow create: if false;
       allow update: if (owner(uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name', 'updatedAt']))
         || (roleIs('admin') && resource.data.role != 'admin' && request.resource.data.diff(resource.data).changedKeys().hasOnly(['role', 'active', 'updatedAt']) && request.resource.data.role in ['employee', 'hr']);
       allow delete: if false;
@@ -62,10 +54,7 @@ service cloud.firestore {
       allow get: if staff() && belongs() || owner(resource.data.uid);
       allow list: if staff();
       allow update: if owner(resource.data.uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['phone','address','updatedAt']);
-      allow create: if signedIn() && request.auth.uid == id && request.resource.data.uid == id
-        && request.resource.data.role == 'employee' && request.resource.data.companyId == 'default'
-        && request.resource.data.keys().hasOnly(['companyId', 'uid', 'role', 'fullName', 'email', 'employeeCode', 'phone', 'address', 'departmentId', 'designationId', 'joiningDate', 'status', 'createdAt'])
-        && existsAfter(/databases/$(database)/documents/users/$(id));
+      allow create: if false;
       allow delete: if false;
     }
     match /salary_records/{id} {

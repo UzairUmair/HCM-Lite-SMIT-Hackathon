@@ -10,6 +10,7 @@ const initial = { fullName: '', email: '', phone: '', address: '', employeeCode:
 
 function AddEmployee() {
   const navigate = useNavigate();
+  const { role } = useApp();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(initial);
   const [departments, setDepartments] = useState([]);
@@ -40,9 +41,9 @@ function AddEmployee() {
       {step === 2 && <><TextField label="Basic monthly salary" type="number" required value={form.basicSalary} onChange={change('basicSalary')} slotProps={{ htmlInput: { min: 1 } }} /><Alert severity="info">House rent allowance is 40% and medical allowance is 10% of basic salary. Salary details are visible only to authorized staff.</Alert></>}
       {step === 3 && <><Typography variant="h6">Review and create</Typography>{Object.entries(form).map(([key, value]) => <Stack key={key} direction="row" sx={{ justifyContent: 'space-between', gap: 2, borderBottom: '1px solid', borderColor: 'divider', py: 1 }}><Typography variant="body2" sx={{ color: 'text.secondary' }}>{key}</Typography><Typography variant="body2" sx={{ textAlign: 'right' }}>{value || '—'}</Typography></Stack>)}<Alert severity="info">Creating this employee also provisions a Firebase login. The temporary password is shown only once.</Alert></>}
       {error && <Alert severity="error">{error}</Alert>}
-      <Stack direction="row" sx={{ gap: 1, mt: 2 }}><Button onClick={() => step ? setStep(step - 1) : navigate('/hr/employees')} disabled={busy}>{step ? 'Back' : 'Cancel'}</Button>{step < 3 ? <Button variant="contained" type="submit">Next</Button> : <Button variant="contained" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create employee'}</Button>}</Stack>
+      <Stack direction="row" sx={{ gap: 1, mt: 2 }}><Button onClick={() => step ? setStep(step - 1) : navigate(`/${role}/employees`)} disabled={busy}>{step ? 'Back' : 'Cancel'}</Button>{step < 3 ? <Button variant="contained" type="submit">Next</Button> : <Button variant="contained" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create employee'}</Button>}</Stack>
     </Stack></Box>
-  </Card><Dialog open={!!password} onClose={() => { setPassword(''); navigate('/hr/employees'); }}><DialogTitle>Employee account created</DialogTitle><DialogContent><Alert severity="success" sx={{ mb: 2 }}>The employee is saved in Firebase.</Alert><Typography variant="body2">Share this temporary password privately. It is shown only once.</Typography><Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, overflowWrap: 'anywhere' }}>{password}</Box></DialogContent><DialogActions><Button onClick={() => { setPassword(''); navigate('/hr/employees'); }}>Done</Button></DialogActions></Dialog></>;
+  </Card><Dialog open={!!password} onClose={() => { setPassword(''); navigate(`/${role}/employees`); }}><DialogTitle>Employee account created</DialogTitle><DialogContent><Alert severity="success" sx={{ mb: 2 }}>The employee is saved in Firebase.</Alert><Typography variant="body2">Share this temporary password privately. It is shown only once.</Typography><Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1, overflowWrap: 'anywhere' }}>{password}</Box></DialogContent><DialogActions><Button onClick={() => { setPassword(''); navigate(`/${role}/employees`); }}>Done</Button></DialogActions></Dialog></>;
 }
 
 function CompanyPage({ policy = false }) {

@@ -42,7 +42,7 @@ test('Firestore roles protect employee, salary, payslip and audit data', async (
     const registration = writeBatch(newEmployee);
     registration.set(doc(newEmployee, 'users', 'newEmployee'), { uid: 'newEmployee', name: 'New Employee', email: 'new@example.com', role: 'employee', active: true, companyId: 'default', employeeId: 'newEmployee', mustChangePassword: false, createdAt: new Date() });
     registration.set(doc(newEmployee, 'employees', 'newEmployee'), { uid: 'newEmployee', role: 'employee', companyId: 'default', fullName: 'New Employee', email: 'new@example.com', employeeCode: '', phone: '', address: '', departmentId: '', designationId: '', joiningDate: '', status: 'Active', createdAt: new Date() });
-    await assertSucceeds(registration.commit());
+    await assertFails(registration.commit());
     await assertFails(updateDoc(doc(employee, 'users', 'employee1'), { role: 'hr' }));
     await assertFails(setDoc(doc(newEmployee, 'users', 'malicious'), { uid: 'malicious', name: 'Bad', email: 'new@example.com', role: 'admin', active: true, companyId: 'default', employeeId: 'malicious', mustChangePassword: false, createdAt: new Date() }));
     await assertSucceeds(updateDoc(doc(admin, 'users', 'employee2'), { role: 'hr', updatedAt: new Date() }));
