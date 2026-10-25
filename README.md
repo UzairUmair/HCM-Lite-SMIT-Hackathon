@@ -16,8 +16,8 @@ HCM Lite is a React, Material UI, Firebase Authentication and Firestore applicat
 3. Authenticate Firebase CLI and select the project only when you are ready to deploy:
 
    ```powershell
-   npx firebase login
-   npx firebase use hcm-lite-cff96
+   npx --package=firebase-tools@15.34.1 firebase login
+   npx --package=firebase-tools@15.34.1 firebase use hcm-lite-cff96
    ```
 
 4. Create the first Admin once in the Firebase Console. This is the simple hackathon setup; it needs no public activation page or terminal command.
@@ -54,7 +54,7 @@ For emulator work, set `VITE_USE_FIREBASE_EMULATORS=true` in `.env.local`, then 
 ```powershell
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot'
 $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
-npx firebase emulators:start
+npx --package=firebase-tools@15.34.1 firebase emulators:start
 ```
 
 ## What is implemented
@@ -85,14 +85,14 @@ The legacy `npm run bootstrap --prefix functions` script remains a private devel
 Required secret for AI deployment:
 
 ```powershell
-npx firebase functions:secrets:set GROQ_API_KEY
+npx --package=firebase-tools@15.34.1 firebase functions:secrets:set GROQ_API_KEY
 ```
 
 Cloud Functions deployment generally requires Firebase Blaze billing. This project does not enable billing or deploy anything automatically. Deploy only after the project owner has enabled and approved the appropriate plan:
 
 ```powershell
 npm run build
-npx firebase deploy --only firestore,functions,hosting
+npx --package=firebase-tools@15.34.1 firebase deploy --only firestore,functions,hosting
 ```
 
 ## Verification
@@ -105,7 +105,7 @@ npm test --prefix functions
 node --test src/utils/payslipPdf.test.js
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot'
 $env:PATH="$env:JAVA_HOME\bin;$env:PATH"
-npx firebase emulators:exec --project demo-hcm-lite-rules --only firestore "node --test tests/firestore.rules.test.mjs"
+npx --package=firebase-tools@15.34.1 firebase emulators:exec --project demo-hcm-lite-rules --only firestore "node --test tests/firestore.rules.test.mjs"
 ```
 
 The function tests cover working days, leave overlap/balances, attendance status and correction timestamps, each supplied tax boundary, deduction rules, joining-date proration, payroll locking and finalized-only PDF generation. Rules tests cover employee isolation, protected salaries/payslips/audits, staff access, public Employee signup, rejected self-promotion and Admin-only HR promotion.
