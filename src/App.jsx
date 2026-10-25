@@ -1,13 +1,14 @@
-import { ThemeProvider, CssBaseline, Snackbar, Alert } from '@mui/material';
+import { lazy, Suspense } from 'react';
+import { ThemeProvider, CssBaseline, Snackbar, Alert, CircularProgress, Box } from '@mui/material';
 import { Routes, Route, Navigate } from 'react-router';
 import { AppProvider, useApp } from './context/AppContext';
 import { makeTheme } from './theme/theme';
 import ProtectedRoute from './routes/ProtectedRoute';
 import AuthPage from './pages/AuthPage';
-import Dashboard from './pages/Dashboard';
-import ModulePage from './pages/ModulePage';
-import AssistantPage from './pages/AssistantPage';
-import ImportEmployeesPage from './pages/ImportEmployeesPage';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ModulePage = lazy(() => import('./pages/ModulePage'));
+const AssistantPage = lazy(() => import('./pages/AssistantPage'));
+const ImportEmployeesPage = lazy(() => import('./pages/ImportEmployeesPage'));
 import { EmptyState } from './components/Common';
 import { navigation } from './routes/navigation';
 function Content() {
@@ -25,5 +26,5 @@ function ErrorPage({
   return <div className="error-page"><EmptyState title={unauthorized ? 'This workspace is restricted' : 'We couldn’t find that page'} text={unauthorized ? 'Choose the matching role preview to explore this workspace.' : 'The page may have moved. Return to the start to continue.'} /><a href="/login">Return to sign in</a></div>;
 }
 export default function App() {
-  return <AppProvider><Content /></AppProvider>;
+  return <AppProvider><Suspense fallback={<Box role="status" aria-label="Loading page" sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>}><Content /></Suspense></AppProvider>;
 }
