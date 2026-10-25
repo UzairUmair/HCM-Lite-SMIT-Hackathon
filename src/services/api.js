@@ -99,7 +99,26 @@ export const authService = {
   },
   async signOut() { if (auth) await signOut(auth); },
 };
-export const accountService = { update: data => call('updateOwnAccount', data) };
+export const accountService = {
+  async update(data) {
+    ready();
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Please sign in again.');
+    const name = String(data.fullName || '').trim();
+    if (!name) throw new Error('Please enter your full name.');
+
+    // Account settings must work in the hosted app without a separately
+    // deployed Cloud Function. Every signed-in user may update their own
+    // display name; employee and HR records also keep their phone in sync.
+    const userRef = doc(db, 'users', uid);
+    const batch = writeBatch(db);
+    batch.update(userRef, { name, updatedAt: serverTimestamp() });
+    if (data.syncEmployee) {
+      batch.update(doc(db, 'employees', uid), { phone: String(data.phone || '').trim(), updatedAt: serverTimestamp() });
+    }
+    await batch.commit();
+  },
+};
 export const companyService = {
   async get() { ready(); const d = await getDoc(doc(db, 'companies', 'default')); return d.exists() ? { id: d.id, ...d.data() } : null; },
   save: data => call('saveCompany', data),

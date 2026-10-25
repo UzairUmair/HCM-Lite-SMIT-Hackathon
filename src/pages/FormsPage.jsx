@@ -110,8 +110,15 @@ function AccountSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  useEffect(() => { if (!account?.employeeId) return; peopleService.get(account.employeeId).then(record => setForm({ fullName: account.name || record?.fullName || '', phone: record?.phone || '' })).catch(cause => setError(friendlyError(cause))); }, [account]);
-  async function save(event) { event.preventDefault(); setBusy(true); setError(''); setSuccess(''); try { await accountService.update(form); setSuccess('Account details saved.'); } catch (cause) { setError(friendlyError(cause)); } finally { setBusy(false); } }
+  useEffect(() => {
+    // Administrators do not require an employee record. Looking one up used
+    // to show a misleading permission error on an otherwise valid profile.
+    if (!account?.employeeId || account?.role === 'admin') return;
+    peopleService.get(account.employeeId)
+      .then(record => setForm({ fullName: account.name || record?.fullName || '', phone: record?.phone || '' }))
+      .catch(() => setForm(current => ({ ...current, fullName: account.name || current.fullName })));
+  }, [account]);
+  async function save(event) { event.preventDefault(); setBusy(true); setError(''); setSuccess(''); try { await accountService.update({ ...form, syncEmployee: account?.role !== 'admin' }); setSuccess('Account details saved.'); } catch (cause) { setError(friendlyError(cause)); } finally { setBusy(false); } }
   return <><PageHeader title="Account settings" subtitle="Keep your account details secure and up to date." />{error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}<Card title="Your details" sx={{ mb: 3 }}><Box component="form" onSubmit={save} sx={{ maxWidth: 480, display: 'grid', gap: 2 }}><TextField label="Full name" required value={form.fullName} onChange={event => setForm({ ...form, fullName: event.target.value })} /><TextField label="Email address" value={account?.email || ''} disabled helperText="Email changes require an administrator-led account update." /><TextField label="Phone" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /><Button type="submit" variant="contained" disabled={busy}>{busy ? 'Saving…' : 'Save details'}</Button></Box></Card><Card title="Password"><Typography variant="body2" sx={{ mb: 2 }}>Choose a new password whenever you need to.</Typography><Button href="/change-password" variant="outlined">Change password</Button></Card></>;
 }
 
